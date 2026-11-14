@@ -1,3 +1,4 @@
+
 require("dotenv").config();
 
 const express = require("express");
@@ -101,12 +102,16 @@ app.post("/api/admin/message", requireAdmin, (req, res) => {
     const message = req.body?.message;
 
     if (typeof message !== "string" || !message.trim()) {
-        return res.status(400).json({ error: "Įrašyk žinutę" });
+        return res.status(400).json({
+            error: "Įrašyk žinutę"
+        });
     }
 
     announcement = message.trim().slice(0, 300);
 
-    io.emit("adminMessage", { message: announcement });
+    io.emit("adminMessage", {
+        message: announcement
+    });
 
     res.json({ success: true });
 });
@@ -131,7 +136,10 @@ app.post("/api/admin/settings", requireAdmin, (req, res) => {
         settings.maintenance = maintenance;
     }
 
-    res.json({ success: true, settings });
+    res.json({
+        success: true,
+        settings
+    });
 });
 
 // BAN PLAYER
@@ -139,7 +147,9 @@ app.post("/api/admin/ban", requireAdmin, (req, res) => {
     const id = req.body?.id;
 
     if (typeof id !== "string" || !players.has(id)) {
-        return res.status(404).json({ error: "Žaidėjas nerastas" });
+        return res.status(404).json({
+            error: "Žaidėjas nerastas"
+        });
     }
 
     const socket = io.sockets.sockets.get(id);
@@ -148,6 +158,7 @@ app.post("/api/admin/ban", requireAdmin, (req, res) => {
         socket.emit("banned", {
             message: "Prieiga prie serverio užblokuota."
         });
+
         socket.disconnect(true);
     }
 
@@ -157,7 +168,9 @@ app.post("/api/admin/ban", requireAdmin, (req, res) => {
 // ADMIN LOGOUT
 app.post("/api/admin/logout", requireAdmin, (req, res) => {
     const token = req.headers.authorization.slice(7);
+
     tokens.delete(token);
+
     res.json({ success: true });
 });
 
@@ -172,24 +185,27 @@ io.on("connection", socket => {
     const player = {
         id: socket.id,
         username: "Player_" + socket.id.slice(0, 5),
-        position: { x: 0, y: 0, z: 0 },
+        position: {
+            x: 0,
+            y: 0,
+            z: 0
+        },
         rotation: 0
     };
 
     players.set(socket.id, player);
 
-    // Atsiųsti jau prisijungusius žaidėjus
     socket.emit("playersUpdate", publicPlayers());
 
-    // Pranešimas iš administratoriaus
-    socket.emit("adminMessage", { message: announcement });
+    socket.emit("adminMessage", {
+        message: announcement
+    });
 
-    // Pranešti kitiems apie naują žaidėją
     socket.broadcast.emit("playerJoined", player);
 
     io.emit("playersUpdate", publicPlayers());
 
-    // Žaidėjo judėjimo sinchronizavimas
+    // PLAYER MOVEMENT
     socket.on("playerMove", data => {
         const current = players.get(socket.id);
 
@@ -220,17 +236,23 @@ io.on("connection", socket => {
         });
     });
 
+    // PLAYER DISCONNECT
     socket.on("disconnect", () => {
         players.delete(socket.id);
 
-        io.emit("playerLeft", { id: socket.id });
+        io.emit("playerLeft", {
+            id: socket.id
+        });
+
         io.emit("playersUpdate", publicPlayers());
     });
 });
 
+// SERVER START
 const PORT = process.env.PORT || 3000;
 
 server.listen(PORT, "0.0.0.0", () => {
-    console.log("Neo Shooter 3D server running on port " + PORT);
+    console.log(
+        "Neo Shooter 3D server running on port " + PORT
+    );
 });
-l
