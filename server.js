@@ -1,3 +1,4 @@
+
 require("dotenv").config();
 
 const express = require("express");
@@ -17,11 +18,10 @@ const ADMIN_USERNAME = process.env.ADMIN_USERNAME;
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD;
 
 if (!ADMIN_USERNAME || !ADMIN_PASSWORD) {
-    throw new Error("Nustatyk ADMIN_USERNAME ir ADMIN_PASSWORD .env faile");
+    throw new Error("Nustatyk ADMIN_USERNAME ir ADMIN_PASSWORD");
 }
 
 const players = new Map();
-const bannedPlayers = new Set();
 const tokens = new Map();
 
 let settings = {
@@ -42,10 +42,21 @@ function requireAdmin(req, res, next) {
 
     if (!expiry || expiry < Date.now()) {
         tokens.delete(token);
-        return res.status(401).json({ error: "Reikia administratoriaus prisijungimo" });
+        return res.status(401).json({
+            error: "Reikia administratoriaus prisijungimo"
+        });
     }
 
     next();
+}
+
+function publicPlayers() {
+    return Array.from(players.values()).map(player => ({
+        id: player.id,
+        username: player.username,
+        position: { ...player.position },
+        rotation: player.rotation
+    }));
 }
 
 // ADMIN LOGIN
@@ -58,11 +69,12 @@ app.post("/api/admin/login", (req, res) => {
         username !== ADMIN_USERNAME ||
         password !== ADMIN_PASSWORD
     ) {
-        return res.status(401).json({ error: "Neteisingi prisijungimo duomenys" });
+        return res.status(401).json({
+            error: "Neteisingi prisijungimo duomenys"
+        });
     }
 
     const token = crypto.randomBytes(32).toString("hex");
-
     tokens.set(token, Date.now() + 60 * 60 * 1000);
 
     res.json({
@@ -82,15 +94,10 @@ app.get("/api/status", (req, res) => {
 
 // PLAYER LIST
 app.get("/api/players", requireAdmin, (req, res) => {
-    res.json(
-        Array.from(players.values()).map(player => ({
-            id: player.id,
-            username: player.username
-        }))
-    );
+    res.json(publicPlayers());
 });
 
-// ANNOUNCEMENTS
+// ADMIN MESSAGE
 app.post("/api/admin/message", requireAdmin, (req, res) => {
     const message = req.body?.message;
 
@@ -100,9 +107,7 @@ app.post("/api/admin/message", requireAdmin, (req, res) => {
 
     announcement = message.trim().slice(0, 300);
 
-    io.emit("adminMessage", {
-        message: announcement
-    });
+    io.emit("adminMessage", { message: announcement });
 
     res.json({ success: true });
 });
@@ -138,8 +143,6 @@ app.post("/api/admin/ban", requireAdmin, (req, res) => {
         return res.status(404).json({ error: "Žaidėjas nerastas" });
     }
 
-    bannedPlayers.add(id);
-
     const socket = io.sockets.sockets.get(id);
 
     if (socket) {
@@ -152,19 +155,16 @@ app.post("/api/admin/ban", requireAdmin, (req, res) => {
     res.json({ success: true });
 });
 
-// LOGOUT
+// ADMIN LOGOUT
 app.post("/api/admin/logout", requireAdmin, (req, res) => {
     const token = req.headers.authorization.slice(7);
     tokens.delete(token);
     res.json({ success: true });
 });
 
-// GAME CONNECTION
+// MULTIPLAYER CONNECTION
 io.on("connection", socket => {
-    if (
-        settings.maintenance ||
-        players.size >= settings.maxPlayers
-    ) {
+    if (settings.maintenance || players.size >= settings.maxPlayers) {
         socket.emit("serverUnavailable");
         socket.disconnect(true);
         return;
@@ -172,18 +172,60 @@ io.on("connection", socket => {
 
     const player = {
         id: socket.id,
-        username: "Player_" + socket.id.slice(0, 5)
+        username: "Player_" + socket.id.slice(0, 5),
+        position: { x: 0, y: 0, z: 0 },
+        rotation: 0
     };
 
     players.set(socket.id, player);
 
+    // Atsiųsti jau prisijungusius žaidėjus
+    socket.emit("playersUpdate", publicPlayers());
+
+    // Pranešimas iš administratoriaus
     socket.emit("adminMessage", { message: announcement });
 
-    io.emit("playersUpdate", Array.from(players.values()));
+    // Pranešti kitiems apie naują žaidėją
+    socket.broadcast.emit("playerJoined", player);
+
+    io.emit("playersUpdate", publicPlayers());
+
+    // Žaidėjo judėjimo sinchronizavimas
+    socket.on("playerMove", data => {
+        const current = players.get(socket.id);
+
+        if (!current || !data || typeof data !== "object") {
+            return;
+        }
+
+        const x = Number(data.x);
+        const z = Number(data.z);
+        const rotation = Number(data.rotation);
+
+        if (
+            !Number.isFinite(x) ||
+            !Number.isFinite(z) ||
+            !Number.isFinite(rotation)
+        ) {
+            return;
+        }
+
+        current.position.x = Math.max(-45, Math.min(45, x));
+        current.position.z = Math.max(-45, Math.min(45, z));
+        current.rotation = rotation;
+
+        socket.broadcast.emit("playerMoved", {
+            id: socket.id,
+            position: current.position,
+            rotation: current.rotation
+        });
+    });
 
     socket.on("disconnect", () => {
         players.delete(socket.id);
-        io.emit("playersUpdate", Array.from(players.values()));
+
+        io.emit("playerLeft", { id: socket.id });
+        io.emit("playersUpdate", publicPlayers());
     });
 });
 
@@ -192,3 +234,4 @@ const PORT = process.env.PORT || 3000;
 server.listen(PORT, "0.0.0.0", () => {
     console.log("Neo Shooter 3D server running on port " + PORT);
 });
+l
