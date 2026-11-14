@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="lt">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Neo Shooter 3D</title>
+
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            background: #080d18;
+            color: white;
+            font-family: Arial, sans-serif;
+            text-align: center;
+        }
+
+        header {
+            padding: 15px;
+            background: #101b32;
+            border-bottom: 2px solid #00eaff;
+        }
+
+        h1 {
+            color: #00eaff;
+            text-shadow: 0 0 15px #00eaff;
+        }
+
+        .container {
+            padding: 15px;
+            max-width: 900px;
+            margin: auto;
+        }
+
+        .panel {
+            background: #111c30;
+            padding: 20px;
+            border-radius: 15px;
+            margin-top: 20px;
+            border: 1px solid #00eaff;
+        }
+
+        button {
+            background: #00d9ff;
+            color: #06101b;
+            border: none;
+            padding: 15px 30px;
+            border-radius: 8px;
+            font-size: 18px;
+            font-weight: bold;
+            margin: 10px;
+            cursor: pointer;
+        }
+
+        #game {
+            display: none;
+            width: 100%;
+            height: 70vh;
+            min-height: 400px;
+            margin-top: 20px;
+            background: #050912;
+            border: 2px solid #00eaff;
+            border-radius: 12px;
+            overflow: hidden;
+            position: relative;
+            padding: 0;
+        }
+
+        #game canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+        }
+
+        .status {
+            color: #00ffbb;
+        }
+
+        #gameInfo {
+            margin: 10px;
+        }
+    </style>
+</head>
+
+<body>
+
+<header>
+    <h1>NEO SHOOTER 3D</h1>
+    <p>Online Multiplayer Game</p>
+</header>
+
+<div class="container">
+
+    <div class="panel" id="menu">
+        <h2>Welcome to Neo Shooter 3D</h2>
+        <p>Pasiruošęs žaisti?</p>
+
+        <p class="status" id="status">
+            Tikrinamas serveris...
+        </p>
+
+        <button onclick="startGame()">PLAY</button>
+    </div>
+
+    <div id="game">
+        <div id="gameInfo">
+            <span id="players">Žaidėjai: 0</span>
+            <p id="messages"></p>
+            <button onclick="exitGame()">EXIT</button>
+        </div>
+    </div>
+
+</div>
+
+<script src="/socket.io/socket.io.js"></script>
+
+<script>
+let socket;
+let gameStarted = false;
+
+async function checkServer() {
+    try {
+        const response = await fetch("/api/status");
+
+        if (!response.ok) throw new Error();
+
+        const data = await response.json();
+
+        document.getElementById("status").textContent =
+            "Serveris veikia: " + data.settings.serverName;
+
+    } catch {
+        document.getElementById("status").textContent =
+            "Serveris nepasiekiamas";
+    }
+}
+
+function startGame() {
+    if (gameStarted) return;
+
+    socket = io();
+
+    socket.on("connect", () => {
+        gameStarted = true;
+
+        document.getElementById("menu").style.display = "none";
+        document.getElementById("game").style.display = "block";
+
+        window.dispatchEvent(new Event("resize"));
+    });
+
+    socket.on("playersUpdate", (players) => {
+        document.getElementById("players").textContent =
+            "Žaidėjai: " + players.length;
+    });
+
+    socket.on("adminMessage", (data) => {
+        document.getElementById("messages").textContent =
+            data.message;
+    });
+
+    socket.on("serverUnavailable", () => {
+        alert("Serveris šiuo metu nepasiekiamas!");
+        exitGame();
+    });
+
+    socket.on("connect_error", () => {
+        alert("Nepavyko prisijungti prie serverio.");
+        exitGame();
+    });
+}
+
+function exitGame() {
+    if (socket) {
+        socket.disconnect();
+        socket = null;
+    }
+
+    gameStarted = false;
+
+    document.getElementById("game").style.display = "none";
+    document.getElementById("menu").style.display = "block";
+}
+
+checkServer();
+</script>
+
+<script type="module" src="/game.js"></script>
+
+</body>
+</html>
