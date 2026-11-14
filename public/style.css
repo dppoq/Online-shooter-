@@ -5,16 +5,70 @@
     padding: 0;
 }
 
+:root {
+    --cyan: #00d9ff;
+    --blue: #087eb5;
+    --background: #080b18;
+    --panel: #111932;
+    --border: #315b9d;
+}
+
+html,
 body {
+    width: 100%;
+    min-height: 100%;
     font-family: Arial, sans-serif;
-    background: #080b18;
+    background: var(--background);
     color: white;
+    overflow-x: hidden;
+}
+
+body {
     min-height: 100vh;
 }
 
+button,
+input {
+    font: inherit;
+}
+
+button {
+    cursor: pointer;
+    color: white;
+    background: #172c55;
+    border: 1px solid #2778bd;
+    border-radius: 9px;
+    padding: 12px 17px;
+    font-weight: bold;
+    transition: background 0.2s, box-shadow 0.2s;
+    touch-action: manipulation;
+}
+
+button:hover {
+    background: var(--blue);
+    box-shadow: 0 0 14px rgba(0, 217, 255, 0.5);
+}
+
+button:disabled {
+    opacity: 0.65;
+    cursor: default;
+    box-shadow: none;
+}
+
+input {
+    max-width: 100%;
+    padding: 12px;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    background: #091326;
+    color: white;
+}
+
+/* MAIN MENU */
+
 #menu {
     min-height: 100vh;
-    padding: 35px 16px;
+    padding: 30px 16px;
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -26,17 +80,17 @@ body {
 
 header {
     text-align: center;
-    margin-bottom: 30px;
+    margin-bottom: 28px;
 }
 
 header h1 {
     font-size: clamp(30px, 8vw, 55px);
     letter-spacing: 4px;
-    text-shadow: 0 0 20px #00d9ff;
+    text-shadow: 0 0 20px var(--cyan);
 }
 
 header h1 span {
-    color: #00d9ff;
+    color: var(--cyan);
 }
 
 header p {
@@ -47,10 +101,10 @@ header p {
 
 .menu-card {
     width: 100%;
-    max-width: 440px;
-    padding: 28px;
-    background: rgba(17, 25, 52, 0.94);
-    border: 1px solid #315b9d;
+    max-width: 460px;
+    padding: 26px;
+    background: rgba(17, 25, 50, 0.96);
+    border: 1px solid var(--border);
     border-radius: 18px;
     box-shadow: 0 0 35px rgba(0, 190, 255, 0.15);
     text-align: center;
@@ -63,23 +117,7 @@ header p {
 
 #serverStatus {
     color: #aab9d9;
-    margin-bottom: 25px;
-}
-
-button {
-    cursor: pointer;
-    color: white;
-    background: #172c55;
-    border: 1px solid #2778bd;
-    border-radius: 9px;
-    padding: 13px 18px;
-    font-weight: bold;
-    transition: 0.2s;
-}
-
-button:hover {
-    background: #087eb5;
-    box-shadow: 0 0 15px #00c8ff;
+    margin-bottom: 24px;
 }
 
 #playButton {
@@ -88,80 +126,201 @@ button:hover {
     font-size: 22px;
     letter-spacing: 4px;
     background: linear-gradient(90deg, #0879b9, #5739b8);
-    margin-bottom: 22px;
+    margin-bottom: 20px;
 }
 
 .menu-buttons {
     display: grid;
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 10px;
+}
+
+.menu-buttons button {
+    min-height: 46px;
 }
 
 #menuPanel {
     margin-top: 22px;
     padding: 18px;
-    border: 1px solid #315b9d;
+    border: 1px solid var(--border);
     border-radius: 12px;
     background: #0c142b;
+    text-align: left;
 }
 
 #menuPanel h3 {
-    margin-bottom: 15px;
-    color: #00d9ff;
+    color: var(--cyan);
+    margin-bottom: 12px;
+}
+
+#panelTitle {
+    text-align: center;
 }
 
 #panelContent {
     margin-bottom: 15px;
     color: #d5def8;
+    overflow-wrap: anywhere;
 }
 
-#panelContent button,
-#panelContent select,
+#panelContent button {
+    margin: 4px;
+}
+
 #panelContent input {
-    margin: 5px;
-    max-width: 100%;
+    margin: 7px 0;
+}
+
+#closePanel {
+    width: 100%;
 }
 
 footer {
     color: #657397;
     font-size: 12px;
-    margin-top: 30px;
+    margin-top: 28px;
 }
+
+/* GAME */
 
 #game {
     position: fixed;
     inset: 0;
     overflow: hidden;
     background: #101b32;
+    touch-action: none;
 }
+
+#game[hidden],
+#menu[hidden] {
+    display: none !important;
+}
+
+#game canvas {
+    position: absolute;
+    inset: 0;
+    display: block;
+    width: 100%;
+    height: 100%;
+}
+
+/* GAME INFORMATION */
 
 #gameInfo {
     position: absolute;
     z-index: 10;
-    top: 12px;
-    left: 12px;
-    right: 12px;
+    top: 10px;
+    left: 10px;
+    right: 10px;
     display: flex;
     flex-wrap: wrap;
     align-items: center;
-    gap: 12px;
-    padding: 12px;
+    gap: 10px;
+    padding: 11px;
     border-radius: 12px;
-    background: rgba(5, 10, 25, 0.8);
-    border: 1px solid #315b9d;
+    background: rgba(5, 10, 25, 0.82);
+    border: 1px solid var(--border);
+    backdrop-filter: blur(8px);
+}
+
+#playerInfo,
+#onlinePlayers {
+    font-size: 13px;
+    font-weight: bold;
 }
 
 #adminAnnouncement {
     flex: 1;
-    color: #00d9ff;
+    min-width: 100px;
+    color: var(--cyan);
+    font-size: 13px;
 }
 
 #exitButton {
     background: #8b263e;
+    border-color: #e94358;
+    padding: 10px 14px;
 }
 
-canvas {
-    display: block;
-    width: 100%;
-    height: 100%;
+/* MOBILE CONTROLS */
+
+#touchControls {
+    user-select: none;
+    -webkit-user-select: none;
+}
+
+.neo-pad {
+    text-align: center;
+}
+
+.neo-pad button {
+    width: 56px;
+    height: 56px;
+    margin: 3px;
+    border-radius: 13px;
+    border: 1px solid var(--cyan);
+    color: white;
+    background: rgba(8, 25, 50, 0.85);
+    font-size: 22px;
+    touch-action: none;
+}
+
+.neo-pad button:active {
+    background: var(--blue);
+}
+
+/* EQUIPMENT */
+
+#panelContent h3 {
+    color: var(--cyan);
+    font-size: 15px;
+    letter-spacing: 1px;
+}
+
+#panelContent button:disabled {
+    background: #176044;
+    border-color: #20e58a;
+    color: white;
+}
+
+#panelContent input[type="color"] {
+    width: 65px;
+    height: 45px;
+    padding: 3px;
+    cursor: pointer;
+}
+
+/* SMALL SCREENS */
+
+@media (max-width: 480px) {
+    #menu {
+        padding: 20px 12px;
+    }
+
+    .menu-card {
+        padding: 20px 15px;
+    }
+
+    header h1 {
+        letter-spacing: 2px;
+    }
+
+    .menu-buttons {
+        gap: 8px;
+    }
+
+    .menu-buttons button {
+        padding: 11px 7px;
+        font-size: 12px;
+    }
+
+    #gameInfo {
+        gap: 7px;
+        padding: 8px;
+    }
+
+    #gameInfo button {
+        padding: 9px 11px;
+        font-size: 12px;
+    }
 }
