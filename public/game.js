@@ -1,25 +1,27 @@
 import * as THREE from "https://cdn.jsdelivr.net/npm/three@0.180.0/build/three.module.js";
 
-// ================================
+// =====================================
 // NEO SHOOTER 3D
-// ================================
+// =====================================
 
-const socket = window.io();
-
+const menu = document.getElementById("menu");
 const gameElement = document.getElementById("game");
-const menuElement = document.getElementById("menu");
 const playButton = document.getElementById("playButton");
 const exitButton = document.getElementById("exitButton");
 const playerInfo = document.getElementById("playerInfo");
 const onlinePlayers = document.getElementById("onlinePlayers");
 const announcement = document.getElementById("adminAnnouncement");
+const serverStatus = document.getElementById("serverStatus");
+const menuPanel = document.getElementById("menuPanel");
 
-let scene;
-let camera;
-let renderer;
-let player;
-let animationId;
+let socket = null;
+let scene = null;
+let camera = null;
+let renderer = null;
+let player = null;
 let gameRunning = false;
+let animationId = null;
+let previousTime = 0;
 let lastNetworkUpdate = 0;
 
 const otherPlayers = new Map();
@@ -44,7 +46,7 @@ const equipment = {
 let playerName = localStorage.getItem("neoUsername") || "Žaidėjas";
 let playerColor = localStorage.getItem("neoColor") || "#00eaff";
 
-const cosmeticColors = {
+const colors = {
     weapon: {
         neon: 0x00eaff,
         gold: 0xffcc33,
@@ -66,13 +68,126 @@ const cosmeticColors = {
     }
 };
 
-// ================================
+// =====================================
+// SERVER CONNECTION
+// =====================================
+
+function connectServer() {
+    if (socket && socket.connected) return;
+
+    if (typeof window.io !== "function") {
+        setServerStatus("Serverio biblioteka nepasiekiama");
+        return;
+    }
+
+    if (!socket) {
+        socket = window.io({
+            reconnection: true,
+            reconnectionAttempts: 10,
+            reconnectionDelay: 2000,
+            timeout: 10000
+        });
+
+        socket.on("connect", () => {
+            setServerStatus("Server connected");
+            updateOnlineCount();
+            sendPlayerUpdate();
+        });
+
+        socket.on("connect_error", () => {
+            setServerStatus("Offline – žaidimas veikia lokaliai");
+        });
+
+        socket.on("disconnect", () => {
+            setServerStatus("Server disconnected");
+            updateOnlineCount();
+        });
+
+        socket.on("playersUpdate", (players) => {
+            if (!Array.isArray(players)) return;
+
+            const received = new Set();
+
+            players.forEach(data => {
+                if (!data || data.id === socket.id) return;
+                received.add(data.id);
+                addOtherPlayer(data);
+            });
+
+            for (const id of otherPlayers.keys()) {
+                if (!received.has(id)) {
+                    removeOtherPlayer(id);
+                }
+            }
+
+            updateOnlineCount();
+        });
+
+        socket.on("playerJoined", addOtherPlayer);
+        socket.on("playerMoved", updateOtherPlayer);
+
+        socket.on("playerLeft", data => {
+            if (data?.id) removeOtherPlayer(data.id);
+            updateOnlineCount();
+        });
+
+        socket.on("adminMessage", data => {
+            if (!announcement) return;
+
+            announcement.textContent = data?.message || "";
+            announcement.style.display = "block";
+
+            setTimeout(() => {
+                announcement.style.display = "none";
+            }, 6000);
+        });
+
+        socket.on("serverNotice", data => {
+            alert(data?.message || "Serverio pranešimas");
+            exitGame();
+        });
+
+        socket.on("banned", data => {
+            alert(data?.message || "Prisijungimas nutrauktas");
+            exitGame();
+        });
+    } else {
+        socket.connect();
+    }
+}
+
+function setServerStatus(message) {
+    if (serverStatus) {
+        serverStatus.textContent = message;
+    }
+}
+
+function sendPlayerUpdate() {
+    if (!socket?.connected || !player) return;
+
+    socket.emit("playerMove", {
+        x: player.position.x,
+        z: player.position.z,
+        rotation: player.rotation.y,
+        username: playerName,
+        color: playerColor,
+        equipment: { ...equipment }
+    });
+}
+
+function updateOnlineCount() {
+    if (!onlinePlayers) return;
+
+    onlinePlayers.textContent =
+        "Online: " + (socket?.connected ? otherPlayers.size + 1 : 0);
+}
+
+// =====================================
 // WORLD
-// ================================
+// =====================================
 
 function createWorld() {
     scene = new THREE.Scene();
-
     scene.background = new THREE.Color(0x071426);
     scene.fog = new THREE.Fog(0x071426, 35, 150);
 
@@ -83,42 +198,19 @@ function createWorld() {
         300
     );
 
-    renderer = new THREE.WebGLRenderer({
-        antialias: true
-    });
-
-    renderer.setPixelRatio(
-        Math.min(window.devicePixelRatio, 2)
-    );
-
-    renderer.setSize(
-        window.innerWidth,
-        window.innerHeight
-    );
-
+    renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.setSize(window.innerWidth, window.innerHeight);
     renderer.shadowMap.enabled = true;
 
     gameElement.appendChild(renderer.domElement);
 
-    const ambient = new THREE.HemisphereLight(
-        0xb9eaff,
-        0x182030,
-        2
-    );
+    scene.add(new THREE.HemisphereLight(0xb9eaff, 0x182030, 2));
 
-    scene.add(ambient);
-
-    const sunlight = new THREE.DirectionalLight(
-        0xffffff,
-        2
-    );
-
+    const sunlight = new THREE.DirectionalLight(0xffffff, 2);
     sunlight.position.set(20, 35, 20);
     sunlight.castShadow = true;
-
     scene.add(sunlight);
-
-    // Ground
 
     const ground = new THREE.Mesh(
         new THREE.PlaneGeometry(180, 180),
@@ -130,39 +222,23 @@ function createWorld() {
 
     ground.rotation.x = -Math.PI / 2;
     ground.receiveShadow = true;
-
     scene.add(ground);
 
-    // Grid
-
     const grid = new THREE.GridHelper(
-        180,
-        90,
-        0x087caa,
-        0x243c50
+        180, 90, 0x087caa, 0x243c50
     );
-
     grid.position.y = 0.02;
     scene.add(grid);
-
-    // Roads
 
     createRoad(0, 0, 180, 9);
     createRoad(0, 0, 9, 180);
 
-    // Buildings
-
     for (let x = -65; x <= 65; x += 22) {
         for (let z = -65; z <= 65; z += 22) {
-            if (Math.abs(x) < 15 || Math.abs(z) < 15) {
-                continue;
-            }
-
+            if (Math.abs(x) < 15 || Math.abs(z) < 15) continue;
             createBuilding(x, z);
         }
     }
-
-    // Neon decorations
 
     for (let i = 0; i < 18; i++) {
         const light = new THREE.PointLight(
@@ -180,7 +256,8 @@ function createWorld() {
         scene.add(light);
     }
 
-    createPlayer();
+    player = createAvatar(playerColor, equipment);
+    scene.add(player);
 
     window.addEventListener("resize", resizeGame);
 }
@@ -188,14 +265,11 @@ function createWorld() {
 function createRoad(x, z, width, height) {
     const road = new THREE.Mesh(
         new THREE.PlaneGeometry(width, height),
-        new THREE.MeshStandardMaterial({
-            color: 0x101923
-        })
+        new THREE.MeshStandardMaterial({ color: 0x101923 })
     );
 
     road.rotation.x = -Math.PI / 2;
     road.position.set(x, 0.04, z);
-
     scene.add(road);
 }
 
@@ -212,26 +286,16 @@ function createBuilding(x, z) {
         })
     );
 
-    building.position.set(
-        x,
-        height / 2,
-        z
-    );
-
+    building.position.set(x, height / 2, z);
     building.castShadow = true;
     building.receiveShadow = true;
-
     scene.add(building);
 
-    // Windows
-
     for (let y = 2; y < height - 1; y += 3) {
-        for (let side = -1; side <= 1; side += 2) {
+        for (const side of [-1, 1]) {
             const windowMesh = new THREE.Mesh(
                 new THREE.BoxGeometry(0.8, 1, 0.08),
-                new THREE.MeshBasicMaterial({
-                    color: 0x00cfff
-                })
+                new THREE.MeshBasicMaterial({ color: 0x00cfff })
             );
 
             windowMesh.position.set(
@@ -245,83 +309,48 @@ function createBuilding(x, z) {
     }
 }
 
-// ================================
-// AVATAR
-// ================================
+// =====================================
+// AVATAR AND COSMETICS
+// =====================================
 
-function createAvatar(color, avatarEquipment = equipment) {
+function createAvatar(color, selected = equipment) {
     const group = new THREE.Group();
 
     const outfitColor =
-        cosmeticColors.outfit[avatarEquipment.outfit] ||
-        cosmeticColors.outfit.default;
-
-    // Body
+        colors.outfit[selected.outfit] || colors.outfit.default;
 
     const body = new THREE.Mesh(
         new THREE.CapsuleGeometry(0.48, 0.9, 5, 10),
-        new THREE.MeshStandardMaterial({
-            color: outfitColor
-        })
+        new THREE.MeshStandardMaterial({ color: outfitColor })
     );
 
     body.position.y = 1.15;
     body.castShadow = true;
-
     group.add(body);
-
-    // Head
 
     const head = new THREE.Mesh(
         new THREE.SphereGeometry(0.34, 20, 20),
-        new THREE.MeshStandardMaterial({
-            color: color
-        })
+        new THREE.MeshStandardMaterial({ color })
     );
 
     head.position.y = 2.05;
     head.castShadow = true;
-
     group.add(head);
-
-    // Face
-
-    const face = new THREE.Mesh(
-        new THREE.SphereGeometry(0.04, 10, 10),
-        new THREE.MeshBasicMaterial({
-            color: 0xffffff
-        })
-    );
-
-    face.position.set(0, 2.08, 0.31);
-
-    group.add(face);
-
-    // Eyes
 
     for (const side of [-1, 1]) {
         const eye = new THREE.Mesh(
             new THREE.SphereGeometry(0.045, 12, 12),
-            new THREE.MeshBasicMaterial({
-                color: 0x111111
-            })
+            new THREE.MeshBasicMaterial({ color: 0x111111 })
         );
 
-        eye.position.set(
-            side * 0.12,
-            2.12,
-            0.30
-        );
-
+        eye.position.set(side * 0.12, 2.12, 0.30);
         group.add(eye);
     }
 
-    // Decorative cosmetic accessory
-    // This is visual only and has no firing or combat function.
+    // Decorative cosmetic item only
 
     const accessoryColor =
-        cosmeticColors.weapon[avatarEquipment.weapon] ||
-        cosmeticColors.weapon.neon;
+        colors.weapon[selected.weapon] || colors.weapon.neon;
 
     const accessory = new THREE.Mesh(
         new THREE.BoxGeometry(0.13, 0.13, 0.8),
@@ -335,66 +364,61 @@ function createAvatar(color, avatarEquipment = equipment) {
     accessory.position.set(0.55, 1.25, 0.2);
     group.add(accessory);
 
-    // Shield cosmetic
-
     const shieldColor =
-        cosmeticColors.shield[avatarEquipment.shield] ||
-        cosmeticColors.shield.blue;
+        colors.shield[selected.shield] || colors.shield.blue;
 
     const shield = new THREE.Mesh(
         new THREE.SphereGeometry(
-            0.55,
-            16,
-            16,
-            0,
-            Math.PI * 2,
-            0,
-            Math.PI
+            0.55, 16, 16, 0, Math.PI * 2, 0, Math.PI
         ),
         new THREE.MeshStandardMaterial({
             color: shieldColor,
             transparent: true,
-            opacity: 0.35,
-            metalness: 0.5,
-            roughness: 0.3
+            opacity: 0.35
         })
     );
 
     shield.position.set(-0.65, 1.25, 0);
     shield.scale.set(0.45, 1.2, 0.3);
-
     group.add(shield);
 
     return group;
 }
 
-function createPlayer() {
-    player = createAvatar(playerColor, equipment);
+function addOtherPlayer(data) {
+    if (!data?.id || data.id === socket?.id || !scene) return;
 
-    player.position.set(0, 0, 0);
+    let object = otherPlayers.get(data.id);
 
-    scene.add(player);
+    if (object) {
+        scene.remove(object);
+    }
+
+    object = createAvatar(
+        data.color || "#ff55aa",
+        data.equipment || {}
+    );
+
+    object.position.set(
+        Number(data.x) || 0,
+        0,
+        Number(data.z) || 0
+    );
+
+    object.rotation.y = Number(data.rotation) || 0;
+
+    scene.add(object);
+    otherPlayers.set(data.id, object);
 }
 
-// ================================
-// OTHER PLAYERS
-// ================================
-
-function addOtherPlayer(data) {
-    if (!data || !data.id || data.id === socket.id) {
-        return;
-    }
+function updateOtherPlayer(data) {
+    if (!data?.id) return;
 
     let object = otherPlayers.get(data.id);
 
     if (!object) {
-        object = createAvatar(
-            data.color || "#ff55aa",
-            data.equipment || {}
-        );
-
-        scene.add(object);
-        otherPlayers.set(data.id, object);
+        addOtherPlayer(data);
+        return;
     }
 
     object.position.set(
@@ -409,134 +433,18 @@ function addOtherPlayer(data) {
 function removeOtherPlayer(id) {
     const object = otherPlayers.get(id);
 
-    if (object) {
-        scene.remove(object);
-        otherPlayers.delete(id);
-    }
+    if (object && scene) scene.remove(object);
+
+    otherPlayers.delete(id);
 }
 
-function updateOtherPlayer(data) {
-    if (!data || !data.id) return;
-
-    let object = otherPlayers.get(data.id);
-
-    if (!object) {
-        addOtherPlayer(data);
-        return;
-    }
-
-    object.position.set(
-        Number(data.x) || 0,
-        0,
-        Number(data.z) || 0
-    );
-
-    object.rotation.y = Number(data.rotation) || 0;
-}
-
-// ================================
-// MULTIPLAYER
-// ================================
-
-function connectServer() {
-    socket.connect();
-
-    socket.on("connect", () => {
-        console.log("Connected to Neo Shooter server");
-
-        updateOnlineCount();
-    });
-
-    socket.on("playersUpdate", (players) => {
-        if (!Array.isArray(players)) return;
-
-        const receivedIds = new Set();
-
-        players.forEach(data => {
-            if (data.id === socket.id) return;
-
-            receivedIds.add(data.id);
-            addOtherPlayer(data);
-        });
-
-        for (const id of otherPlayers.keys()) {
-            if (!receivedIds.has(id)) {
-                removeOtherPlayer(id);
-            }
-        }
-
-        updateOnlineCount();
-    });
-
-    socket.on("playerJoined", (data) => {
-        addOtherPlayer(data);
-        updateOnlineCount();
-    });
-
-    socket.on("playerMoved", (data) => {
-        updateOtherPlayer(data);
-    });
-
-    socket.on("playerLeft", (data) => {
-        removeOtherPlayer(data.id);
-        updateOnlineCount();
-    });
-
-    socket.on("adminMessage", (data) => {
-        if (!announcement) return;
-
-        announcement.textContent = data.message || "";
-        announcement.style.display = "block";
-
-        setTimeout(() => {
-            announcement.style.display = "none";
-        }, 6000);
-    });
-
-    socket.on("serverNotice", (data) => {
-        alert(data.message || "Serverio pranešimas");
-        exitGame();
-    });
-
-    socket.on("banned", (data) => {
-        alert(data.message || "Tavo prisijungimas nutrauktas.");
-        exitGame();
-    });
-
-    socket.on("disconnect", () => {
-        updateOnlineCount();
-    });
-}
-
-function sendPlayerUpdate() {
-    if (!socket.connected || !player) return;
-
-    socket.emit("playerMove", {
-        x: player.position.x,
-        z: player.position.z,
-        rotation: player.rotation.y,
-        username: playerName,
-        color: playerColor,
-        equipment: equipment
-    });
-}
-
-function updateOnlineCount() {
-    if (onlinePlayers) {
-        onlinePlayers.textContent =
-            "Prisijungę žaidėjai: " +
-            (socket.connected ? otherPlayers.size + 1 : 0);
-    }
-}
-
-// ================================
+// =====================================
 // MOVEMENT
-// ================================
+// =====================================
 
 function movePlayer(delta) {
     if (!player) return;
 
-    const speed = 8;
     const direction = new THREE.Vector3();
 
     if (keys.forward) direction.z += 1;
@@ -544,49 +452,43 @@ function movePlayer(delta) {
     if (keys.left) direction.x -= 1;
     if (keys.right) direction.x += 1;
 
-    if (direction.length() > 0) {
-        direction.normalize();
+    if (direction.length() === 0) return;
 
-        player.position.x += direction.x * speed * delta;
-        player.position.z += direction.z * speed * delta;
+    direction.normalize();
 
-        player.position.x = THREE.MathUtils.clamp(
-            player.position.x,
-            -75,
-            75
-        );
+    const speed = 8;
 
-        player.position.z = THREE.MathUtils.clamp(
-            player.position.z,
-            -75,
-            75
-        );
+    player.position.x += direction.x * speed * delta;
+    player.position.z += direction.z * speed * delta;
 
-        player.rotation.y = Math.atan2(
-            direction.x,
-            direction.z
-        );
-    }
+    player.position.x = THREE.MathUtils.clamp(
+        player.position.x, -75, 75
+    );
+
+    player.position.z = THREE.MathUtils.clamp(
+        player.position.z, -75, 75
+    );
+
+    player.rotation.y = Math.atan2(direction.x, direction.z);
 }
 
 function setupKeyboard() {
-    window.addEventListener("keydown", (event) => {
+    window.addEventListener("keydown", event => {
+        if (event.target.matches("input, textarea, select")) return;
+
         switch (event.key.toLowerCase()) {
             case "w":
             case "arrowup":
                 keys.forward = true;
                 break;
-
             case "s":
             case "arrowdown":
                 keys.backward = true;
                 break;
-
             case "a":
             case "arrowleft":
                 keys.left = true;
                 break;
-
             case "d":
             case "arrowright":
                 keys.right = true;
@@ -594,23 +496,20 @@ function setupKeyboard() {
         }
     });
 
-    window.addEventListener("keyup", (event) => {
+    window.addEventListener("keyup", event => {
         switch (event.key.toLowerCase()) {
             case "w":
             case "arrowup":
                 keys.forward = false;
                 break;
-
             case "s":
             case "arrowdown":
                 keys.backward = false;
                 break;
-
             case "a":
             case "arrowleft":
                 keys.left = false;
                 break;
-
             case "d":
             case "arrowright":
                 keys.right = false;
@@ -619,9 +518,9 @@ function setupKeyboard() {
     });
 }
 
-// ================================
+// =====================================
 // MOBILE CONTROLS
-// ================================
+// =====================================
 
 function setupTouchControls() {
     let controls = document.getElementById("touchControls");
@@ -649,40 +548,37 @@ function setupTouchControls() {
     controls.querySelectorAll("button").forEach(button => {
         const key = button.dataset.key;
 
-        button.addEventListener("pointerdown", (event) => {
+        if (button.dataset.ready) return;
+        button.dataset.ready = "yes";
+
+        button.addEventListener("pointerdown", event => {
             event.preventDefault();
             keys[key] = true;
         });
 
-        button.addEventListener("pointerup", () => {
+        const release = () => {
             keys[key] = false;
-        });
+        };
 
-        button.addEventListener("pointerleave", () => {
-            keys[key] = false;
-        });
-
-        button.addEventListener("pointercancel", () => {
-            keys[key] = false;
-        });
+        button.addEventListener("pointerup", release);
+        button.addEventListener("pointerleave", release);
+        button.addEventListener("pointercancel", release);
     });
 }
 
 function hideTouchControls() {
     const controls = document.getElementById("touchControls");
 
-    if (controls) {
-        controls.style.display = "none";
-    }
+    if (controls) controls.style.display = "none";
 
     Object.keys(keys).forEach(key => {
         keys[key] = false;
     });
 }
 
-// ================================
-// FRONT THIRD-PERSON CAMERA
-// ================================
+// =====================================
+// FRONT CAMERA
+// =====================================
 
 function updateCamera() {
     if (!player || !camera) return;
@@ -693,13 +589,13 @@ function updateCamera() {
         Math.cos(player.rotation.y)
     );
 
-    const targetCamera = new THREE.Vector3(
+    const target = new THREE.Vector3(
         player.position.x + forward.x * 8,
         player.position.y + 3.2,
         player.position.z + forward.z * 8
     );
 
-    camera.position.lerp(targetCamera, 0.09);
+    camera.position.lerp(target, 0.09);
 
     camera.lookAt(
         player.position.x,
@@ -708,11 +604,9 @@ function updateCamera() {
     );
 }
 
-// ================================
+// =====================================
 // ANIMATION
-// ================================
-
-let previousTime = 0;
+// =====================================
 
 function animate(time = 0) {
     if (!gameRunning) return;
@@ -729,7 +623,7 @@ function animate(time = 0) {
     movePlayer(delta);
     updateCamera();
 
-    if (time - lastNetworkUpdate > 80) {
+    if (time - lastNetworkUpdate > 100) {
         sendPlayerUpdate();
         lastNetworkUpdate = time;
     }
@@ -737,30 +631,24 @@ function animate(time = 0) {
     renderer.render(scene, camera);
 }
 
-// ================================
+// =====================================
 // GAME START / EXIT
-// ================================
+// =====================================
 
 function startGame() {
     if (gameRunning) return;
 
-    if (!scene) {
-        createWorld();
-    }
+    if (!scene) createWorld();
 
     gameRunning = true;
 
-    if (menuElement) {
-        menuElement.style.display = "none";
-    }
-
-    gameElement.style.display = "block";
+    menu.hidden = true;
+    gameElement.hidden = false;
 
     setupTouchControls();
 
-    if (!socket.connected) {
-        connectServer();
-    }
+    // Connect in background. Never block PLAY.
+    connectServer();
 
     previousTime = 0;
     animate();
@@ -769,43 +657,42 @@ function startGame() {
 function exitGame() {
     gameRunning = false;
 
-    cancelAnimationFrame(animationId);
+    if (animationId) {
+        cancelAnimationFrame(animationId);
+    }
 
     hideTouchControls();
 
-    if (menuElement) {
-        menuElement.style.display = "flex";
-    }
+    menu.hidden = false;
+    gameElement.hidden = true;
 
-    if (gameElement) {
-        gameElement.style.display = "none";
-    }
+    if (socket) socket.disconnect();
 
-    socket.disconnect();
-
-    otherPlayers.forEach(object => {
-        scene.remove(object);
-    });
-
+    otherPlayers.forEach(object => scene?.remove(object));
     otherPlayers.clear();
+
+    updateOnlineCount();
 }
 
-// ================================
-// AVATAR MENU
-// ================================
+function resizeGame() {
+    if (!camera || !renderer) return;
+
+    camera.aspect = window.innerWidth / window.innerHeight;
+    camera.updateProjectionMatrix();
+
+    renderer.setSize(window.innerWidth, window.innerHeight);
+}
+
+// =====================================
+// SAVE SETTINGS
+// =====================================
 
 function saveAvatar() {
     localStorage.setItem("neoUsername", playerName);
     localStorage.setItem("neoColor", playerColor);
 
-    if (playerInfo) {
-        playerInfo.textContent = playerName;
-    }
+    if (playerInfo) playerInfo.textContent = playerName;
 }
-
-// ================================
-// EQUIPMENT MENU
-// ================================
 
 function saveEquipment() {
     localStorage.setItem(
@@ -813,45 +700,58 @@ function saveEquipment() {
         JSON.stringify(equipment)
     );
 
-    if (player && scene) {
-        const oldPosition = player.position.clone();
-        const oldRotation = player.rotation.y;
+    if (scene && player) {
+        const position = player.position.clone();
+        const rotation = player.rotation.y;
 
         scene.remove(player);
-
         player = createAvatar(playerColor, equipment);
-
-        player.position.copy(oldPosition);
-        player.rotation.y = oldRotation;
-
+        player.position.copy(position);
+        player.rotation.y = rotation;
         scene.add(player);
     }
+
+    sendPlayerUpdate();
 }
 
-// ================================
+function cleanName(value) {
+    return String(value || "Žaidėjas")
+        .replace(/[<>]/g, "")
+        .trim()
+        .slice(0, 18) || "Žaidėjas";
+}
+
+function escapeHTML(value) {
+    return String(value).replace(/[&<>"']/g, char => ({
+        "&": "&amp;",
+        "<": "&lt;",
+        ">": "&gt;",
+        '"': "&quot;",
+        "'": "&#39;"
+    })[char]);
+}
+
+// =====================================
 // MENU PANELS
-// ================================
+// =====================================
 
-function showPanel(panelName) {
-    const panel = document.getElementById("menuPanel");
+function showPanel(name) {
+    if (!menuPanel) return;
 
-    if (!panel) return;
+    menuPanel.hidden = false;
 
-    panel.style.display = "block";
-
-    if (panelName === "avatar") {
-        panel.innerHTML = `
-            <h2>Avataras</h2>
-
-            <label>Žaidėjo vardas</label>
+    if (name === "avatar") {
+        menuPanel.innerHTML = `
+            <h2>Avatar</h2>
+            <label>Player name</label>
             <input id="avatarName" maxlength="18"
                 value="${escapeHTML(playerName)}">
 
-            <label>Avataro spalva</label>
+            <label>Avatar color</label>
             <input id="avatarColor" type="color"
                 value="${playerColor}">
 
-            <button id="saveAvatar">Išsaugoti</button>
+            <button id="saveAvatar">SAVE</button>
         `;
 
         document.getElementById("saveAvatar").onclick = () => {
@@ -864,15 +764,23 @@ function showPanel(panelName) {
 
             saveAvatar();
 
-            alert("Avataras išsaugotas!");
+            if (scene && player) {
+                const position = player.position.clone();
+                scene.remove(player);
+                player = createAvatar(playerColor, equipment);
+                player.position.copy(position);
+                scene.add(player);
+            }
+
+            sendPlayerUpdate();
         };
     }
 
-    else if (panelName === "equipment") {
-        panel.innerHTML = `
-            <h2>Įranga ir skinai</h2>
+    else if (name === "equipment") {
+        menuPanel.innerHTML = `
+            <h2>STYLE AND EQUIPMENT</h2>
 
-            <label>Ginklo išvaizda</label>
+            <label>Cosmetic item</label>
             <select id="weaponSkin">
                 <option value="neon">Neon</option>
                 <option value="gold">Gold</option>
@@ -881,7 +789,7 @@ function showPanel(panelName) {
                 <option value="red">Red</option>
             </select>
 
-            <label>Skydo skinas</label>
+            <label>Shield skin</label>
             <select id="shieldSkin">
                 <option value="blue">Blue</option>
                 <option value="gold">Gold</option>
@@ -889,7 +797,7 @@ function showPanel(panelName) {
                 <option value="purple">Purple</option>
             </select>
 
-            <label>Apranga</label>
+            <label>Outfit</label>
             <select id="outfitSkin">
                 <option value="default">Default</option>
                 <option value="dark">Dark</option>
@@ -898,4 +806,99 @@ function showPanel(panelName) {
             </select>
 
             <button id="equipButton">EQUIP</button>
-            <button id="resetEqui
+            <button id="resetEquipment">RESET</button>
+        `;
+
+        document.getElementById("weaponSkin").value = equipment.weapon;
+        document.getElementById("shieldSkin").value = equipment.shield;
+        document.getElementById("outfitSkin").value = equipment.outfit;
+
+        document.getElementById("equipButton").onclick = () => {
+            equipment.weapon =
+                document.getElementById("weaponSkin").value;
+
+            equipment.shield =
+                document.getElementById("shieldSkin").value;
+
+            equipment.outfit =
+                document.getElementById("outfitSkin").value;
+
+            saveEquipment();
+            alert("Cosmetics equipped!");
+        };
+
+        document.getElementById("resetEquipment").onclick = () => {
+            equipment.weapon = "neon";
+            equipment.shield = "blue";
+            equipment.outfit = "default";
+
+            saveEquipment();
+            showPanel("equipment");
+        };
+    }
+
+    else if (name === "events") {
+        menuPanel.innerHTML = `
+            <h2>EVENTS</h2>
+            <p>New events coming soon.</p>
+            <p>Cosmetic rewards and special items.</p>
+        `;
+    }
+
+    else if (name === "season") {
+        menuPanel.innerHTML = `
+            <h2>SEASON 1</h2>
+            <p>Neo Season 1</p>
+            <p>Season rewards coming soon.</p>
+        `;
+    }
+
+    else if (name === "settings") {
+        menuPanel.innerHTML = `
+            <h2>SETTINGS</h2>
+            <p>Movement: W A S D or mobile buttons.</p>
+            <p>Camera: front third-person view.</p>
+        `;
+    }
+
+    else if (name === "updates") {
+        menuPanel.innerHTML = `
+            <h2>UPDATES</h2>
+            <p>Neo Shooter 3D</p>
+            <p>3D world, avatars and cosmetics.</p>
+        `;
+    }
+}
+
+// =====================================
+// BUTTON EVENTS
+// =====================================
+
+playButton?.addEventListener("click", startGame);
+exitButton?.addEventListener("click", exitGame);
+
+document.querySelectorAll("[data-panel]").forEach(button => {
+    button.addEventListener("click", () => {
+        showPanel(button.dataset.panel);
+    });
+});
+
+document.getElementById("closePanel")?.addEventListener("click", () => {
+    menuPanel.hidden = true;
+});
+
+// =====================================
+// INITIALIZATION
+// =====================================
+
+if (playerInfo) {
+    playerInfo.textContent = playerName;
+}
+
+setServerStatus("Ready");
+setupKeyboard();
+
+menu.hidden = false;
+gameElement.hidden = true;
+
+console.log("Neo Shooter 3D ready!");
