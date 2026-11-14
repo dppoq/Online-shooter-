@@ -4,7 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Neo Shooter 3D</title>
-
     <style>
         * {
             box-sizing: border-box;
@@ -12,183 +11,134 @@
 
         body {
             margin: 0;
-            background: #080d18;
+            background: #101525;
             color: white;
             font-family: Arial, sans-serif;
             text-align: center;
         }
 
-        header {
-            padding: 15px;
-            background: #101b32;
-            border-bottom: 2px solid #00eaff;
+        #menu {
+            padding: 35px 15px;
         }
 
         h1 {
-            color: #00eaff;
-            text-shadow: 0 0 15px #00eaff;
-        }
-
-        .container {
-            padding: 15px;
-            max-width: 900px;
-            margin: auto;
-        }
-
-        .panel {
-            background: #111c30;
-            padding: 20px;
-            border-radius: 15px;
-            margin-top: 20px;
-            border: 1px solid #00eaff;
+            color: #00d9ff;
         }
 
         button {
-            background: #00d9ff;
-            color: #06101b;
-            border: none;
-            padding: 15px 30px;
+            padding: 13px 22px;
+            margin: 6px;
+            border: 0;
             border-radius: 8px;
-            font-size: 18px;
+            background: #00bde8;
+            color: #07111c;
             font-weight: bold;
-            margin: 10px;
             cursor: pointer;
         }
 
         #game {
             display: none;
             width: 100%;
-            height: 70vh;
+            height: 80vh;
             min-height: 400px;
-            margin-top: 20px;
-            background: #050912;
-            border: 2px solid #00eaff;
-            border-radius: 12px;
-            overflow: hidden;
             position: relative;
-            padding: 0;
-        }
-
-        #game canvas {
-            display: block;
-            width: 100%;
-            height: 100%;
-        }
-
-        .status {
-            color: #00ffbb;
+            overflow: hidden;
         }
 
         #gameInfo {
-            margin: 10px;
+            position: absolute;
+            z-index: 10;
+            top: 10px;
+            left: 10px;
+            right: 10px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            pointer-events: none;
+        }
+
+        #gameInfo button {
+            pointer-events: auto;
+        }
+
+        #status {
+            color: #00e5ff;
         }
     </style>
 </head>
-
 <body>
 
-<header>
-    <h1>NEO SHOOTER 3D</h1>
-    <p>Online Multiplayer Game</p>
-</header>
-
-<div class="container">
-
-    <div class="panel" id="menu">
-        <h2>Welcome to Neo Shooter 3D</h2>
-        <p>Pasiruošęs žaisti?</p>
-
-        <p class="status" id="status">
-            Tikrinamas serveris...
-        </p>
-
+    <div id="menu">
+        <h1>NEO SHOOTER 3D</h1>
+        <p>Online 3D pasaulis</p>
         <button onclick="startGame()">PLAY</button>
+        <p id="status">Jungiamasi prie serverio...</p>
     </div>
 
     <div id="game">
         <div id="gameInfo">
-            <span id="players">Žaidėjai: 0</span>
-            <p id="messages"></p>
+            <span id="playerCount">Žaidėjai: 1</span>
             <button onclick="exitGame()">EXIT</button>
         </div>
     </div>
 
-</div>
+    <script src="/socket.io/socket.io.js"></script>
 
-<script src="/socket.io/socket.io.js"></script>
+    <script>
+        let socket = null;
+        let started = false;
 
-<script>
-let socket;
-let gameStarted = false;
+        function startGame() {
+            if (started) return;
 
-async function checkServer() {
-    try {
-        const response = await fetch("/api/status");
+            socket = io();
 
-        if (!response.ok) throw new Error();
+            socket.on("connect", () => {
+                started = true;
+                document.getElementById("menu").style.display = "none";
+                document.getElementById("game").style.display = "block";
 
-        const data = await response.json();
+                window.gameSocket = socket;
+                window.dispatchEvent(
+                    new CustomEvent("gameSocketReady", {
+                        detail: socket
+                    })
+                );
+            });
 
-        document.getElementById("status").textContent =
-            "Serveris veikia: " + data.settings.serverName;
+            socket.on("playersUpdate", players => {
+                document.getElementById("playerCount").textContent =
+                    "Žaidėjai: " + players.length;
+            });
 
-    } catch {
-        document.getElementById("status").textContent =
-            "Serveris nepasiekiamas";
-    }
-}
+            socket.on("adminMessage", message => {
+                alert(message);
+            });
 
-function startGame() {
-    if (gameStarted) return;
+            socket.on("disconnect", () => {
+                document.getElementById("status").textContent =
+                    "Ryšys su serveriu nutrūko";
+            });
 
-    socket = io();
+            socket.on("connect_error", () => {
+                document.getElementById("status").textContent =
+                    "Nepavyko prisijungti prie serverio";
+            });
+        }
 
-    socket.on("connect", () => {
-        gameStarted = true;
+        function exitGame() {
+            if (socket) {
+                socket.disconnect();
+                socket = null;
+            }
 
-        document.getElementById("menu").style.display = "none";
-        document.getElementById("game").style.display = "block";
+            started = false;
+            document.getElementById("game").style.display = "none";
+            document.getElementById("menu").style.display = "block";
+        }
+    </script>
 
-        window.dispatchEvent(new Event("resize"));
-    });
-
-    socket.on("playersUpdate", (players) => {
-        document.getElementById("players").textContent =
-            "Žaidėjai: " + players.length;
-    });
-
-    socket.on("adminMessage", (data) => {
-        document.getElementById("messages").textContent =
-            data.message;
-    });
-
-    socket.on("serverUnavailable", () => {
-        alert("Serveris šiuo metu nepasiekiamas!");
-        exitGame();
-    });
-
-    socket.on("connect_error", () => {
-        alert("Nepavyko prisijungti prie serverio.");
-        exitGame();
-    });
-}
-
-function exitGame() {
-    if (socket) {
-        socket.disconnect();
-        socket = null;
-    }
-
-    gameStarted = false;
-
-    document.getElementById("game").style.display = "none";
-    document.getElementById("menu").style.display = "block";
-}
-
-checkServer();
-</script>
-
-<script type="module" src="/game.js"></script>
+    <script type="module" src="/game.js"></script>
 
 </body>
 </html>
