@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="lt">
 <head>
@@ -5,7 +6,47 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Neo Shooter 3D</title>
     <link rel="stylesheet" href="/style.css">
+
+    <style>
+        [hidden] {
+            display: none !important;
+        }
+
+        #menu {
+            position: relative;
+            z-index: 10;
+        }
+
+        #game {
+            position: fixed;
+            inset: 0;
+            z-index: 1;
+        }
+
+        #game canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+        }
+
+        #menuPanel {
+            margin-top: 15px;
+        }
+
+        #menuPanel input,
+        #menuPanel select {
+            display: block;
+            margin: 8px 0;
+            padding: 10px;
+            width: 100%;
+        }
+
+        #menuPanel button {
+            margin: 6px;
+        }
+    </style>
 </head>
+
 <body>
 
     <div id="menu">
@@ -16,23 +57,25 @@
 
         <div class="menu-card">
             <h2>Welcome</h2>
+
             <p id="serverStatus">Connecting to server...</p>
 
-            <button id="playButton">PLAY</button>
+            <button id="playButton" type="button">
+                PLAY
+            </button>
 
             <div class="menu-buttons">
-                <button data-panel="avatar">AVATAR</button>
-                <button data-panel="events">EVENTS</button>
-                <button data-panel="season">SEASON</button>
-                <button data-panel="equipment">STYLE</button>
-                <button data-panel="settings">SETTINGS</button>
-                <button data-panel="updates">UPDATES</button>
+                <button type="button" data-panel="avatar">AVATAR</button>
+                <button type="button" data-panel="events">EVENTS</button>
+                <button type="button" data-panel="season">SEASON</button>
+                <button type="button" data-panel="equipment">STYLE</button>
+                <button type="button" data-panel="settings">SETTINGS</button>
+                <button type="button" data-panel="updates">UPDATES</button>
             </div>
 
             <div id="menuPanel" hidden>
-                <h3 id="panelTitle"></h3>
                 <div id="panelContent"></div>
-                <button id="closePanel">CLOSE</button>
+                <button id="closePanel" type="button">CLOSE</button>
             </div>
         </div>
 
@@ -44,7 +87,7 @@
             <div id="playerInfo">Player</div>
             <div id="onlinePlayers">Online: 0</div>
             <div id="adminAnnouncement"></div>
-            <button id="exitButton">EXIT</button>
+            <button id="exitButton" type="button">EXIT</button>
         </div>
     </main>
 
