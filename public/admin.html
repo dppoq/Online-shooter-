@@ -1,0 +1,378 @@
+<!DOCTYPE html>
+<html lang="lt">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Neo Shooter 3D Admin</title>
+
+<style>
+* {
+    box-sizing: border-box;
+}
+
+body {
+    margin: 0;
+    background: #080d18;
+    color: white;
+    font-family: Arial, sans-serif;
+}
+
+header {
+    padding: 20px;
+    text-align: center;
+    background: #101b32;
+    border-bottom: 2px solid #00eaff;
+}
+
+h1 {
+    color: #00eaff;
+    text-shadow: 0 0 15px #00eaff;
+}
+
+main {
+    max-width: 750px;
+    margin: auto;
+    padding: 18px;
+}
+
+section {
+    background: #111c30;
+    border: 1px solid #00eaff;
+    border-radius: 12px;
+    padding: 18px;
+    margin-bottom: 18px;
+}
+
+input {
+    display: block;
+    width: 100%;
+    padding: 13px;
+    margin: 10px 0;
+    background: #080d18;
+    border: 1px solid #00eaff;
+    border-radius: 7px;
+    color: white;
+}
+
+button {
+    background: #00eaff;
+    color: #06101b;
+    border: none;
+    padding: 12px 18px;
+    margin: 5px;
+    border-radius: 7px;
+    font-weight: bold;
+    cursor: pointer;
+}
+
+.danger {
+    background: #ff4055;
+    color: white;
+}
+
+#dashboard[hidden],
+#loginPanel[hidden] {
+    display: none;
+}
+
+.player {
+    background: #1b2940;
+    padding: 12px;
+    margin: 8px 0;
+    border-radius: 7px;
+}
+
+.status {
+    color: #00ffbb;
+}
+
+#error {
+    color: #ff4055;
+}
+</style>
+</head>
+
+<body>
+
+<header>
+<h1>NEO SHOOTER 3D</h1>
+<p>ADMIN CONTROL PANEL</p>
+</header>
+
+<main>
+
+<section id="loginPanel">
+<h2>🔐 ADMIN LOGIN</h2>
+
+<input id="username" placeholder="Admin username">
+<input id="password" type="password" placeholder="Admin password">
+
+<button onclick="login()">LOGIN</button>
+
+<p id="loginStatus"></p>
+</section>
+
+<div id="dashboard" hidden>
+
+<section>
+<h2>📊 Dashboard</h2>
+<p class="status">Administrator connected</p>
+<p id="serverStatus">Loading...</p>
+<button onclick="loadStatus()">Refresh server</button>
+</section>
+
+<section>
+<h2>👥 Players</h2>
+<button onclick="loadPlayers()">Refresh players</button>
+<div id="players">No players loaded</div>
+</section>
+
+<section>
+<h2>📢 Announcements</h2>
+<input id="announcement" placeholder="Write a message">
+<button onclick="sendMessage()">SEND MESSAGE</button>
+</section>
+
+<section>
+<h2>⚙️ Game Settings</h2>
+<input id="serverName" placeholder="Server name">
+<input id="maxPlayers" type="number" min="1" max="100" placeholder="Maximum players">
+<button onclick="saveSettings()">SAVE SETTINGS</button>
+</section>
+
+<section>
+<h2>🔒 Admin Account</h2>
+<button class="danger" onclick="logout()">LOGOUT</button>
+</section>
+
+</div>
+
+</main>
+
+<script>
+"use strict";
+
+let adminToken = "";
+
+async function request(url, options = {}) {
+    const response = await fetch(url, {
+        ...options,
+        headers: {
+            "Content-Type": "application/json",
+            "Authorization": "Bearer " + adminToken,
+            ...options.headers
+        }
+    });
+
+    const data = await response.json();
+
+    if (response.status === 401) {
+        logout(false);
+        throw new Error("Sesija baigėsi. Prisijunk iš naujo.");
+    }
+
+    if (!response.ok) {
+        throw new Error(data.error || "Server error");
+    }
+
+    return data;
+}
+
+async function login() {
+    const username = document.getElementById("username").value.trim();
+    const password = document.getElementById("password").value;
+
+    const status = document.getElementById("loginStatus");
+
+    if (!username || !password) {
+        status.textContent = "Įvesk prisijungimo duomenis.";
+        return;
+    }
+
+    try {
+        const response = await fetch("/api/admin/login", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify({
+                username,
+                password
+            })
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+            throw new Error(data.error || "Prisijungti nepavyko");
+        }
+
+        adminToken = data.token;
+
+        document.getElementById("loginPanel").hidden = true;
+        document.getElementById("dashboard").hidden = false;
+
+        document.getElementById("password").value = "";
+
+        loadStatus();
+        loadPlayers();
+
+    } catch (error) {
+        status.textContent = error.message;
+    }
+}
+
+async function loadStatus() {
+    try {
+        const data = await request("/api/status");
+
+        document.getElementById("serverStatus").textContent =
+            "Online: " + data.online +
+            " | Server: " + data.settings.serverName +
+            " | Maintenance: " + data.settings.maintenance;
+
+        document.getElementById("serverName").value =
+            data.settings.serverName;
+
+        document.getElementById("maxPlayers").value =
+            data.settings.maxPlayers;
+
+    } catch (error) {
+        alert(error.message);
+    }
+}
+
+async function loadPlayers() {
+    try {
+        const players = await request("/api/players");
+        const container = document.getElementById("players");
+
+        container.replaceChildren();
+
+        if (players.length === 0) {
+            container.textContent = "Šiuo metu žaidėjų nėra.";
+            return;
+        }
+
+        players.forEach(player => {
+            const item = document.createElement("div");
+            item.className = "player";
+
+            const name = document.createElement("span");
+            name.textContent = player.username + " ";
+
+            const ban = document.createElement("button");
+            ban.className = "danger";
+            ban.textContent = "BAN";
+
+            ban.onclick = () => banPlayer(player.id);
+
+            item.append(name, ban);
+            container.appendChild(item);
+        });
+
+    } catch (error) {
+        alert(error.message);
+    }
+}
+
+async function banPlayer(id) {
+    if (!confirm("Ar tikrai nori blokuoti šį žaidėją?")) {
+        return;
+    }
+
+    try {
+        await request("/api/admin/ban", {
+            method: "POST",
+            body: JSON.stringify({ id })
+        });
+
+        alert("Žaidėjas užblokuotas.");
+        loadPlayers();
+
+    } catch (error) {
+        alert(error.message);
+    }
+}
+
+async function sendMessage() {
+    const message =
+        document.getElementById("announcement").value.trim();
+
+    if (!message) {
+        alert("Įrašyk pranešimą.");
+        return;
+    }
+
+    try {
+        await request("/api/admin/message", {
+            method: "POST",
+            body: JSON.stringify({ message })
+        });
+
+        document.getElementById("announcement").value = "";
+        alert("Pranešimas išsiųstas!");
+
+    } catch (error) {
+        alert(error.message);
+    }
+}
+
+async function saveSettings() {
+    const serverName =
+        document.getElementById("serverName").value.trim();
+
+    const maxPlayers =
+        Number(document.getElementById("maxPlayers").value);
+
+    if (
+        !serverName ||
+        !Number.isInteger(maxPlayers) ||
+        maxPlayers < 1 ||
+        maxPlayers > 100
+    ) {
+        alert("Neteisingi nustatymai.");
+        return;
+    }
+
+    try {
+        await request("/api/admin/settings", {
+            method: "POST",
+            body: JSON.stringify({
+                serverName,
+                maxPlayers
+            })
+        });
+
+        alert("Nustatymai išsaugoti!");
+        loadStatus();
+
+    } catch (error) {
+        alert(error.message);
+    }
+}
+
+async function logout(sendRequest = true) {
+    if (sendRequest && adminToken) {
+        try {
+            await request("/api/admin/logout", {
+                method: "POST"
+            });
+        } catch (error) {
+            console.log(error.message);
+        }
+    }
+
+    adminToken = "";
+
+    document.getElementById("dashboard").hidden = true;
+    document.getElementById("loginPanel").hidden = false;
+
+    document.getElementById("password").value = "";
+    document.getElementById("loginStatus").textContent =
+        "Atsijungta.";
+}
+</script>
+
+</body>
+</html>
