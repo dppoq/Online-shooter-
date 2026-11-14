@@ -1,378 +1,283 @@
+
 <!DOCTYPE html>
 <html lang="lt">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Neo Shooter 3D Admin</title>
-
 <style>
-* {
-    box-sizing: border-box;
-}
-
+* { box-sizing: border-box; }
 body {
     margin: 0;
-    background: #080d18;
+    padding: 20px;
+    background: #080d1c;
     color: white;
     font-family: Arial, sans-serif;
 }
-
-header {
-    padding: 20px;
-    text-align: center;
-    background: #101b32;
-    border-bottom: 2px solid #00eaff;
-}
-
-h1 {
-    color: #00eaff;
-    text-shadow: 0 0 15px #00eaff;
-}
-
-main {
-    max-width: 750px;
+.container {
+    max-width: 850px;
     margin: auto;
-    padding: 18px;
 }
-
-section {
-    background: #111c30;
-    border: 1px solid #00eaff;
+h1 { color: #00d9ff; }
+.card {
+    background: #141f38;
+    border: 1px solid #315b9d;
     border-radius: 12px;
     padding: 18px;
-    margin-bottom: 18px;
+    margin: 15px 0;
 }
-
-input {
-    display: block;
-    width: 100%;
-    padding: 13px;
-    margin: 10px 0;
-    background: #080d18;
-    border: 1px solid #00eaff;
-    border-radius: 7px;
-    color: white;
-}
-
-button {
-    background: #00eaff;
-    color: #06101b;
-    border: none;
-    padding: 12px 18px;
-    margin: 5px;
-    border-radius: 7px;
-    font-weight: bold;
-    cursor: pointer;
-}
-
-.danger {
-    background: #ff4055;
-    color: white;
-}
-
-#dashboard[hidden],
-#loginPanel[hidden] {
-    display: none;
-}
-
-.player {
-    background: #1b2940;
+input, button {
     padding: 12px;
-    margin: 8px 0;
+    margin: 5px 0;
     border-radius: 7px;
+    border: 1px solid #42649c;
 }
-
-.status {
-    color: #00ffbb;
+input {
+    width: 100%;
+    background: #091326;
+    color: white;
 }
-
-#error {
-    color: #ff4055;
+button {
+    background: #087eb5;
+    color: white;
+    cursor: pointer;
+    font-weight: bold;
 }
+button:hover { background: #159edb; }
+.danger { background: #a52c45; }
+.row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+    padding: 10px 0;
+    border-bottom: 1px solid #30405f;
+}
+#dashboard { display: none; }
+#message { color: #00d9ff; }
 </style>
 </head>
-
 <body>
+<div class="container">
+    <h1>NEO SHOOTER 3D</h1>
+    <p>ADMIN CONTROL PANEL</p>
 
-<header>
-<h1>NEO SHOOTER 3D</h1>
-<p>ADMIN CONTROL PANEL</p>
-</header>
+    <section id="login" class="card">
+        <h2>Admin Login</h2>
+        <input id="username" placeholder="Username" autocomplete="username">
+        <input id="password" type="password" placeholder="Password" autocomplete="current-password">
+        <button id="loginButton">LOGIN</button>
+        <p id="loginMessage"></p>
+    </section>
 
-<main>
+    <section id="dashboard">
+        <div class="card">
+            <h2>Server Status</h2>
+            <p id="status">Loading...</p>
+            <button id="refreshButton">REFRESH</button>
+        </div>
 
-<section id="loginPanel">
-<h2>🔐 ADMIN LOGIN</h2>
+        <div class="card">
+            <h2>Players</h2>
+            <div id="players">Loading...</div>
+        </div>
 
-<input id="username" placeholder="Admin username">
-<input id="password" type="password" placeholder="Admin password">
+        <div class="card">
+            <h2>Server Message</h2>
+            <input id="announcement" maxlength="300" placeholder="Write a message">
+            <button id="sendMessage">SEND MESSAGE</button>
+        </div>
 
-<button onclick="login()">LOGIN</button>
+        <div class="card">
+            <h2>Server Settings</h2>
+            <input id="serverName" maxlength="50" placeholder="Server name">
+            <input id="maxPlayers" type="number" min="1" max="100" value="20">
+            <label>
+                <input id="maintenance" type="checkbox" style="width:auto">
+                Maintenance mode
+            </label>
+            <br>
+            <button id="saveSettings">SAVE SETTINGS</button>
+        </div>
 
-<p id="loginStatus"></p>
-</section>
+        <div class="card">
+            <button id="logoutButton" class="danger">LOGOUT</button>
+        </div>
+    </section>
 
-<div id="dashboard" hidden>
-
-<section>
-<h2>📊 Dashboard</h2>
-<p class="status">Administrator connected</p>
-<p id="serverStatus">Loading...</p>
-<button onclick="loadStatus()">Refresh server</button>
-</section>
-
-<section>
-<h2>👥 Players</h2>
-<button onclick="loadPlayers()">Refresh players</button>
-<div id="players">No players loaded</div>
-</section>
-
-<section>
-<h2>📢 Announcements</h2>
-<input id="announcement" placeholder="Write a message">
-<button onclick="sendMessage()">SEND MESSAGE</button>
-</section>
-
-<section>
-<h2>⚙️ Game Settings</h2>
-<input id="serverName" placeholder="Server name">
-<input id="maxPlayers" type="number" min="1" max="100" placeholder="Maximum players">
-<button onclick="saveSettings()">SAVE SETTINGS</button>
-</section>
-
-<section>
-<h2>🔒 Admin Account</h2>
-<button class="danger" onclick="logout()">LOGOUT</button>
-</section>
-
+    <p id="message"></p>
 </div>
 
-</main>
-
 <script>
-"use strict";
+let token = "";
 
-let adminToken = "";
+const $ = id => document.getElementById(id);
 
-async function request(url, options = {}) {
+async function api(url, options = {}) {
     const response = await fetch(url, {
         ...options,
         headers: {
             "Content-Type": "application/json",
-            "Authorization": "Bearer " + adminToken,
-            ...options.headers
+            ...(token ? { Authorization: "Bearer " + token } : {}),
+            ...(options.headers || {})
         }
     });
 
-    const data = await response.json();
-
-    if (response.status === 401) {
-        logout(false);
-        throw new Error("Sesija baigėsi. Prisijunk iš naujo.");
-    }
+    const data = await response.json().catch(() => ({}));
 
     if (!response.ok) {
-        throw new Error(data.error || "Server error");
+        throw new Error(data.error || "Request failed");
     }
 
     return data;
 }
 
+function showMessage(text) {
+    $("message").textContent = text;
+}
+
 async function login() {
-    const username = document.getElementById("username").value.trim();
-    const password = document.getElementById("password").value;
-
-    const status = document.getElementById("loginStatus");
-
-    if (!username || !password) {
-        status.textContent = "Įvesk prisijungimo duomenis.";
-        return;
-    }
+    $("loginMessage").textContent = "";
 
     try {
-        const response = await fetch("/api/admin/login", {
+        const data = await api("/api/admin/login", {
             method: "POST",
-            headers: {
-                "Content-Type": "application/json"
-            },
             body: JSON.stringify({
-                username,
-                password
+                username: $("username").value,
+                password: $("password").value
             })
         });
 
-        const data = await response.json();
+        token = data.token;
+        $("login").style.display = "none";
+        $("dashboard").style.display = "block";
 
-        if (!response.ok) {
-            throw new Error(data.error || "Prisijungti nepavyko");
-        }
-
-        adminToken = data.token;
-
-        document.getElementById("loginPanel").hidden = true;
-        document.getElementById("dashboard").hidden = false;
-
-        document.getElementById("password").value = "";
-
-        loadStatus();
-        loadPlayers();
-
+        $("password").value = "";
+        await refreshDashboard();
     } catch (error) {
-        status.textContent = error.message;
+        $("loginMessage").textContent = error.message;
     }
 }
 
-async function loadStatus() {
+async function refreshDashboard() {
     try {
-        const data = await request("/api/status");
+        const status = await api("/api/status");
 
-        document.getElementById("serverStatus").textContent =
-            "Online: " + data.online +
-            " | Server: " + data.settings.serverName +
-            " | Maintenance: " + data.settings.maintenance;
+        $("status").textContent =
+            "Online players: " + status.online +
+            " | Server: " + status.settings.serverName +
+            " | Max players: " + status.settings.maxPlayers +
+            " | Maintenance: " + (status.settings.maintenance ? "ON" : "OFF");
 
-        document.getElementById("serverName").value =
-            data.settings.serverName;
+        $("serverName").value = status.settings.serverName;
+        $("maxPlayers").value = status.settings.maxPlayers;
+        $("maintenance").checked = status.settings.maintenance;
 
-        document.getElementById("maxPlayers").value =
-            data.settings.maxPlayers;
-
-    } catch (error) {
-        alert(error.message);
-    }
-}
-
-async function loadPlayers() {
-    try {
-        const players = await request("/api/players");
-        const container = document.getElementById("players");
-
+        const players = await api("/api/players");
+        const container = $("players");
         container.replaceChildren();
 
-        if (players.length === 0) {
-            container.textContent = "Šiuo metu žaidėjų nėra.";
+        if (!players.length) {
+            container.textContent = "No players online.";
             return;
         }
 
         players.forEach(player => {
-            const item = document.createElement("div");
-            item.className = "player";
+            const row = document.createElement("div");
+            row.className = "row";
 
             const name = document.createElement("span");
-            name.textContent = player.username + " ";
+            name.textContent = player.username + " (" + player.id + ")";
 
             const ban = document.createElement("button");
             ban.className = "danger";
-            ban.textContent = "BAN";
+            ban.textContent = "BLOCK";
+            ban.addEventListener("click", () => blockPlayer(player.id));
 
-            ban.onclick = () => banPlayer(player.id);
-
-            item.append(name, ban);
-            container.appendChild(item);
+            row.append(name, ban);
+            container.appendChild(row);
         });
 
     } catch (error) {
-        alert(error.message);
+        showMessage(error.message);
     }
 }
 
-async function banPlayer(id) {
-    if (!confirm("Ar tikrai nori blokuoti šį žaidėją?")) {
-        return;
-    }
+async function blockPlayer(id) {
+    if (!confirm("Block this player?")) return;
 
     try {
-        await request("/api/admin/ban", {
+        await api("/api/admin/ban", {
             method: "POST",
             body: JSON.stringify({ id })
         });
 
-        alert("Žaidėjas užblokuotas.");
-        loadPlayers();
-
+        showMessage("Player blocked.");
+        await refreshDashboard();
     } catch (error) {
-        alert(error.message);
+        showMessage(error.message);
     }
 }
 
 async function sendMessage() {
-    const message =
-        document.getElementById("announcement").value.trim();
-
-    if (!message) {
-        alert("Įrašyk pranešimą.");
-        return;
-    }
-
     try {
-        await request("/api/admin/message", {
+        await api("/api/admin/message", {
             method: "POST",
-            body: JSON.stringify({ message })
+            body: JSON.stringify({
+                message: $("announcement").value
+            })
         });
 
-        document.getElementById("announcement").value = "";
-        alert("Pranešimas išsiųstas!");
-
+        $("announcement").value = "";
+        showMessage("Message sent.");
     } catch (error) {
-        alert(error.message);
+        showMessage(error.message);
     }
 }
 
 async function saveSettings() {
-    const serverName =
-        document.getElementById("serverName").value.trim();
-
-    const maxPlayers =
-        Number(document.getElementById("maxPlayers").value);
-
-    if (
-        !serverName ||
-        !Number.isInteger(maxPlayers) ||
-        maxPlayers < 1 ||
-        maxPlayers > 100
-    ) {
-        alert("Neteisingi nustatymai.");
-        return;
-    }
-
     try {
-        await request("/api/admin/settings", {
+        const maxPlayers = Number($("maxPlayers").value);
+
+        if (!Number.isInteger(maxPlayers) || maxPlayers < 1 || maxPlayers > 100) {
+            throw new Error("Max players must be between 1 and 100.");
+        }
+
+        await api("/api/admin/settings", {
             method: "POST",
             body: JSON.stringify({
-                serverName,
-                maxPlayers
+                serverName: $("serverName").value,
+                maxPlayers,
+                maintenance: $("maintenance").checked
             })
         });
 
-        alert("Nustatymai išsaugoti!");
-        loadStatus();
-
+        showMessage("Settings saved.");
+        await refreshDashboard();
     } catch (error) {
-        alert(error.message);
+        showMessage(error.message);
     }
 }
 
-async function logout(sendRequest = true) {
-    if (sendRequest && adminToken) {
-        try {
-            await request("/api/admin/logout", {
-                method: "POST"
-            });
-        } catch (error) {
-            console.log(error.message);
-        }
+async function logout() {
+    try {
+        await api("/api/admin/logout", { method: "POST" });
+    } catch (error) {
+        // Local logout also works if the session expired.
     }
 
-    adminToken = "";
-
-    document.getElementById("dashboard").hidden = true;
-    document.getElementById("loginPanel").hidden = false;
-
-    document.getElementById("password").value = "";
-    document.getElementById("loginStatus").textContent =
-        "Atsijungta.";
+    token = "";
+    $("dashboard").style.display = "none";
+    $("login").style.display = "block";
+    showMessage("Logged out.");
 }
+
+$("loginButton").addEventListener("click", login);
+$("refreshButton").addEventListener("click", refreshDashboard);
+$("sendMessage").addEventListener("click", sendMessage);
+$("saveSettings").addEventListener("click", saveSettings);
+$("logoutButton").addEventListener("click", logout);
 </script>
-
 </body>
 </html>
