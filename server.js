@@ -26,7 +26,6 @@ const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD;
 
 const players = new Map();
 const adminTokens = new Map();
-const bannedPlayers = new Set();
 
 const settings = {
     serverName: "Neo Shooter 3D",
@@ -35,7 +34,7 @@ const settings = {
 };
 
 // =====================================
-// SAUGUMO FUNKCIJOS
+// SECURITY
 // =====================================
 
 function cleanText(value, maxLength = 100) {
@@ -60,39 +59,32 @@ function cleanEquipment(value) {
 
     return {
         weapon: weapons.includes(value?.weapon)
-            ? value.weapon
-            : "neon",
+            ? value.weapon : "neon",
 
         shield: shields.includes(value?.shield)
-            ? value.shield
-            : "blue",
+            ? value.shield : "blue",
 
         outfit: outfits.includes(value?.outfit)
-            ? value.outfit
-            : "default"
+            ? value.outfit : "default"
     };
 }
 
 function clamp(value, min, max, fallback = 0) {
     const number = Number(value);
 
-    if (!Number.isFinite(number)) {
-        return fallback;
-    }
+    if (!Number.isFinite(number)) return fallback;
 
     return Math.max(min, Math.min(max, number));
 }
 
 // =====================================
-// ADMIN TOKEN
+// ADMIN TOKENS
 // =====================================
 
 function getAdminToken(req) {
     const header = req.headers.authorization || "";
 
-    if (!header.startsWith("Bearer ")) {
-        return null;
-    }
+    if (!header.startsWith("Bearer ")) return null;
 
     return header.slice(7);
 }
@@ -116,7 +108,7 @@ function requireAdmin(req, res, next) {
     if (!verifyAdminToken(token)) {
         return res.status(401).json({
             success: false,
-            message: "Reikia prisijungti prie administratoriaus paskyros."
+            message: "Administratoriaus prisijungimas negalioja."
         });
     }
 
@@ -125,7 +117,7 @@ function requireAdmin(req, res, next) {
 }
 
 // =====================================
-// ŽAIDĖJO INFORMACIJA
+// PLAYER DATA
 // =====================================
 
 function publicPlayer(player) {
@@ -144,7 +136,9 @@ function publicPlayer(player) {
         invisible: player.invisible,
         godMode: player.godMode,
         flying: player.flying,
-        speed: player.speed
+        speed: player.speed,
+
+        isAdmin: player.isAdmin
     };
 }
 
@@ -160,7 +154,7 @@ function updatePlayer(player) {
 }
 
 // =====================================
-// ADMIN PUSLAPIS
+// ADMIN PAGE
 // =====================================
 
 app.get("/admin", (req, res) => {
@@ -180,7 +174,7 @@ app.post("/api/admin/login", (req, res) => {
     if (!ADMIN_USERNAME || !ADMIN_PASSWORD) {
         return res.status(500).json({
             success: false,
-            message: "Nesukonfigūruoti ADMIN_USERNAME ir ADMIN_PASSWORD."
+            message: "ADMIN_USERNAME arba ADMIN_PASSWORD nesukonfigūruotas."
         });
     }
 
@@ -196,10 +190,7 @@ app.post("/api/admin/login", (req, res) => {
 
     const token = crypto.randomBytes(32).toString("hex");
 
-    adminTokens.set(
-        token,
-        Date.now() + 60 * 60 * 1000
-    );
+    adminTokens.set(token, Date.now() + 60 * 60 * 1000);
 
     res.json({
         success: true,
@@ -209,7 +200,7 @@ app.post("/api/admin/login", (req, res) => {
 });
 
 // =====================================
-// SERVERIO BŪKLĖ
+// SERVER STATUS
 // =====================================
 
 app.get("/api/status", (req, res) => {
@@ -221,7 +212,7 @@ app.get("/api/status", (req, res) => {
 });
 
 // =====================================
-// ADMIN ŽAIDĖJŲ SĄRAŠAS
+// PLAYER LIST
 // =====================================
 
 app.get("/api/players", requireAdmin, (req, res) => {
@@ -231,7 +222,7 @@ app.get("/api/players", requireAdmin, (req, res) => {
 });
 
 // =====================================
-// ADMIN PRANEŠIMAS
+// ADMIN MESSAGE
 // =====================================
 
 app.post("/api/admin/message", requireAdmin, (req, res) => {
@@ -245,6 +236,7 @@ app.post("/api/admin/message", requireAdmin, (req, res) => {
     }
 
     io.emit("adminMessage", {
+        text: message,
         message,
         time: Date.now()
     });
@@ -253,7 +245,7 @@ app.post("/api/admin/message", requireAdmin, (req, res) => {
 });
 
 // =====================================
-// SERVERIO NUSTATYMAI
+// SERVER SETTINGS
 // =====================================
 
 app.post("/api/admin/settings", requireAdmin, (req, res) => {
@@ -285,12 +277,11 @@ app.post("/api/admin/settings", requireAdmin, (req, res) => {
 });
 
 // =====================================
-// ADMIN ŽAIDĖJO GALIOS
+// ADMIN PLAYER POWERS
 // =====================================
 
 app.post("/api/admin/powers", requireAdmin, (req, res) => {
-    const playerId = String(req.body.id || "");
-    const player = players.get(playerId);
+    const player = players.get(String(req.body.id || ""));
 
     if (!player) {
         return res.status(404).json({
@@ -314,12 +305,11 @@ app.post("/api/admin/powers", requireAdmin, (req, res) => {
     }
 
     if (powers.speed !== undefined) {
-        player.speed = clamp(
-            powers.speed,
-            0.5,
-            5,
-            1
-        );
+        player.speed = clamp(powers.speed, 0.5, 5, 1);
+    }
+
+    if (!player.flying) {
+        player.y = 0;
     }
 
     updatePlayer(player);
@@ -335,8 +325,7 @@ app.post("/api/admin/powers", requireAdmin, (req, res) => {
 // =====================================
 
 app.post("/api/admin/teleport", requireAdmin, (req, res) => {
-    const playerId = String(req.body.id || "");
-    const player = players.get(playerId);
+    const player = players.get(String(req.body.id || ""));
 
     if (!player) {
         return res.status(404).json({
@@ -347,7 +336,9 @@ app.post("/api/admin/teleport", requireAdmin, (req, res) => {
 
     player.x = clamp(req.body.x, -75, 75, 0);
     player.z = clamp(req.body.z, -75, 75, 0);
-    player.y = clamp(req.body.y, 0, 30, 0);
+    player.y = player.flying
+        ? clamp(req.body.y, 0, 30, 0)
+        : 0;
 
     updatePlayer(player);
 
@@ -358,27 +349,25 @@ app.post("/api/admin/teleport", requireAdmin, (req, res) => {
 });
 
 // =====================================
-// ADMIN ŽAIDĖJO ATJUNGIMAS
+// ADMIN DISCONNECT PLAYER
 // =====================================
 
 app.post("/api/admin/ban", requireAdmin, (req, res) => {
     const playerId = String(req.body.id || "");
-    const socket = io.sockets.sockets.get(playerId);
+    const playerSocket = io.sockets.sockets.get(playerId);
 
-    if (!socket || !players.has(playerId)) {
+    if (!playerSocket || !players.has(playerId)) {
         return res.status(404).json({
             success: false,
             message: "Žaidėjas nerastas."
         });
     }
 
-    bannedPlayers.add(playerId);
-
-    socket.emit("banned", {
+    playerSocket.emit("banned", {
         message: "Administratorius atjungė tave nuo serverio."
     });
 
-    socket.disconnect(true);
+    playerSocket.disconnect(true);
 
     res.json({ success: true });
 });
@@ -394,7 +383,7 @@ app.post("/api/admin/logout", requireAdmin, (req, res) => {
 });
 
 // =====================================
-// SOCKET.IO ADMIN AUTORIZACIJA
+// SOCKET ADMIN AUTH
 // =====================================
 
 io.use((socket, next) => {
@@ -416,18 +405,12 @@ io.use((socket, next) => {
 });
 
 // =====================================
-// ŽAIDĖJŲ SERVERIS
+// GAME SERVER
 // =====================================
 
-io.on("connection", (socket) => {
+io.on("connection", socket => {
     const isAdmin = socket.data.isAdmin === true;
 
-    if (bannedPlayers.has(socket.id)) {
-        socket.disconnect(true);
-        return;
-    }
-
-    // ADMIN gali prisijungti net kai serveris pilnas
     if (!isAdmin && settings.maintenance) {
         socket.emit("serverNotice", {
             message: "Serveris laikinai prižiūrimas."
@@ -487,7 +470,7 @@ io.on("connection", (socket) => {
     );
 
     // =================================
-    // ŽAIDĖJO JUDĖJIMAS
+    // PLAYER MOVEMENT
     // =================================
 
     socket.on("playerMove", (data = {}) => {
@@ -501,43 +484,9 @@ io.on("connection", (socket) => {
 
         current.color = cleanColor(data.color);
 
-        const requestedX = clamp(data.x, -75, 75, current.x);
-        const requestedZ = clamp(data.z, -75, 75, current.z);
-
-        // Judėjimo ribojimas
-        const dx = requestedX - current.x;
-        const dz = requestedZ - current.z;
-
-        const distance = Math.sqrt(dx * dx + dz * dz);
-
-        const maxDistance = 4 * current.speed;
-
-        if (distance > maxDistance) {
-            const factor = maxDistance / distance;
-
-            current.x += dx * factor;
-            current.z += dz * factor;
-        } else {
-            current.x = requestedX;
-            current.z = requestedZ;
-        }
-
-        // Aukštis leidžiamas tik su Fly galia
-        if (current.flying) {
-            current.y = clamp(data.y, 0, 30, current.y);
-        } else {
-            current.y = 0;
-        }
-
-        const rotation = Number(data.rotation);
-
-        current.rotation = Number.isFinite(rotation)
-            ? clamp(rotation, -1000, 1000, 0)
-            : 0;
-
         current.equipment = cleanEquipment(data.equipment);
 
-        // Galias gali nustatyti tik administratorius
+        // Admin powers
         if (current.isAdmin) {
             if (typeof data.invisible === "boolean") {
                 current.invisible = data.invisible;
@@ -556,6 +505,40 @@ io.on("connection", (socket) => {
             }
         }
 
+        // Position
+        const requestedX = clamp(data.x, -75, 75, current.x);
+        const requestedZ = clamp(data.z, -75, 75, current.z);
+
+        const dx = requestedX - current.x;
+        const dz = requestedZ - current.z;
+
+        const distance = Math.sqrt(dx * dx + dz * dz);
+
+        const maxDistance = 4 * current.speed;
+
+        if (distance > maxDistance) {
+            const factor = maxDistance / distance;
+
+            current.x += dx * factor;
+            current.z += dz * factor;
+        } else {
+            current.x = requestedX;
+            current.z = requestedZ;
+        }
+
+        if (current.flying) {
+            current.y = clamp(data.y, 0, 30, current.y);
+        } else {
+            current.y = 0;
+        }
+
+        current.rotation = clamp(
+            data.rotation,
+            -1000,
+            1000,
+            0
+        );
+
         socket.broadcast.emit(
             "playerMoved",
             publicPlayer(current)
@@ -563,7 +546,7 @@ io.on("connection", (socket) => {
     });
 
     // =================================
-    // ATSIJUNGIMAS
+    // DISCONNECT
     // =================================
 
     socket.on("disconnect", () => {
@@ -578,7 +561,7 @@ io.on("connection", (socket) => {
 });
 
 // =====================================
-// AUTOMATINIS TOKEN VALYMAS
+// TOKEN CLEANUP
 // =====================================
 
 setInterval(() => {
@@ -592,11 +575,11 @@ setInterval(() => {
 }, 5 * 60 * 1000);
 
 // =====================================
-// SERVERIO PALEIDIMAS
+// START SERVER
 // =====================================
 
 server.listen(PORT, "0.0.0.0", () => {
     console.log(
-        `Neo Shooter 3D server running on port ${PORT}`
+        `Neo Shooter 3D running on port ${PORT}`
     );
 });
