@@ -4,6 +4,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="theme-color" content="#080d1c">
 <title>Neo Shooter 3D Admin</title>
 <style>
 * { box-sizing: border-box; }
@@ -14,10 +15,7 @@ body {
     color: white;
     font-family: Arial, sans-serif;
 }
-.container {
-    max-width: 850px;
-    margin: auto;
-}
+.container { max-width: 850px; margin: auto; }
 h1 { color: #00d9ff; }
 .card {
     background: #141f38;
@@ -56,6 +54,21 @@ button:hover { background: #159edb; }
 }
 #dashboard { display: none; }
 #message { color: #00d9ff; }
+#loginMessage { color: #ff7185; }
+.game-button {
+    display: inline-block;
+    padding: 13px 20px;
+    margin: 8px 0;
+    border-radius: 7px;
+    background: #087eb5;
+    color: white;
+    text-decoration: none;
+    font-weight: bold;
+}
+@media (max-width: 600px) {
+    body { padding: 12px; }
+    .card { padding: 14px; }
+}
 </style>
 </head>
 <body>
@@ -73,6 +86,11 @@ button:hover { background: #159edb; }
 
     <section id="dashboard">
         <div class="card">
+            <h2>Game</h2>
+            <a class="game-button" href="/" target="_blank" rel="noopener">OPEN GAME</a>
+        </div>
+
+        <div class="card">
             <h2>Server Status</h2>
             <p id="status">Loading...</p>
             <button id="refreshButton">REFRESH</button>
@@ -85,13 +103,13 @@ button:hover { background: #159edb; }
 
         <div class="card">
             <h2>Server Message</h2>
-            <input id="announcement" maxlength="300" placeholder="Write a message">
+            <input id="announcement" maxlength="200" placeholder="Write a message">
             <button id="sendMessage">SEND MESSAGE</button>
         </div>
 
         <div class="card">
             <h2>Server Settings</h2>
-            <input id="serverName" maxlength="50" placeholder="Server name">
+            <input id="serverName" maxlength="40" placeholder="Server name">
             <input id="maxPlayers" type="number" min="1" max="100" value="20">
             <label>
                 <input id="maintenance" type="checkbox" style="width:auto">
@@ -111,7 +129,6 @@ button:hover { background: #159edb; }
 
 <script>
 let token = "";
-
 const $ = id => document.getElementById(id);
 
 async function api(url, options = {}) {
@@ -127,7 +144,7 @@ async function api(url, options = {}) {
     const data = await response.json().catch(() => ({}));
 
     if (!response.ok) {
-        throw new Error(data.error || "Request failed");
+        throw new Error(data.message || data.error || "Request failed");
     }
 
     return data;
@@ -152,8 +169,8 @@ async function login() {
         token = data.token;
         $("login").style.display = "none";
         $("dashboard").style.display = "block";
-
         $("password").value = "";
+
         await refreshDashboard();
     } catch (error) {
         $("loginMessage").textContent = error.message;
@@ -165,20 +182,23 @@ async function refreshDashboard() {
         const status = await api("/api/status");
 
         $("status").textContent =
-            "Online players: " + status.online +
+            "Online players: " + status.players +
             " | Server: " + status.settings.serverName +
             " | Max players: " + status.settings.maxPlayers +
-            " | Maintenance: " + (status.settings.maintenance ? "ON" : "OFF");
+            " | Maintenance: " +
+            (status.settings.maintenance ? "ON" : "OFF");
 
         $("serverName").value = status.settings.serverName;
         $("maxPlayers").value = status.settings.maxPlayers;
         $("maintenance").checked = status.settings.maintenance;
 
-        const players = await api("/api/players");
+        const result = await api("/api/players");
+        const players = result.players || [];
         const container = $("players");
+
         container.replaceChildren();
 
-        if (!players.length) {
+        if (players.length === 0) {
             container.textContent = "No players online.";
             return;
         }
@@ -188,7 +208,8 @@ async function refreshDashboard() {
             row.className = "row";
 
             const name = document.createElement("span");
-            name.textContent = player.username + " (" + player.id + ")";
+            name.textContent =
+                player.username + " (" + player.id + ")";
 
             const ban = document.createElement("button");
             ban.className = "danger";
@@ -198,7 +219,6 @@ async function refreshDashboard() {
             row.append(name, ban);
             container.appendChild(row);
         });
-
     } catch (error) {
         showMessage(error.message);
     }
@@ -240,7 +260,8 @@ async function saveSettings() {
     try {
         const maxPlayers = Number($("maxPlayers").value);
 
-        if (!Number.isInteger(maxPlayers) || maxPlayers < 1 || maxPlayers > 100) {
+        if (!Number.isInteger(maxPlayers) ||
+            maxPlayers < 1 || maxPlayers > 100) {
             throw new Error("Max players must be between 1 and 100.");
         }
 
@@ -264,7 +285,7 @@ async function logout() {
     try {
         await api("/api/admin/logout", { method: "POST" });
     } catch (error) {
-        // Local logout also works if the session expired.
+        // Session may already have expired.
     }
 
     token = "";
