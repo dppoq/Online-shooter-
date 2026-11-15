@@ -1,3 +1,4 @@
+
 require("dotenv").config();
 
 const express = require("express");
@@ -14,7 +15,6 @@ app.use(express.json({ limit: "10kb" }));
 app.use(express.static(path.join(__dirname, "public")));
 
 const PORT = process.env.PORT || 3000;
-
 const ADMIN_USERNAME = process.env.ADMIN_USERNAME;
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD;
 
@@ -75,6 +75,12 @@ function broadcastPlayers() {
     );
 }
 
+// ADMIN PAGE
+app.get("/admin", (req, res) => {
+    res.sendFile(path.join(__dirname, "admin.html"));
+});
+
+// ADMIN AUTHENTICATION
 function requireAdmin(req, res, next) {
     const header = req.headers.authorization || "";
     const token = header.startsWith("Bearer ")
@@ -85,6 +91,7 @@ function requireAdmin(req, res, next) {
 
     if (!expires || expires < Date.now()) {
         adminTokens.delete(token);
+
         return res.status(401).json({
             success: false,
             message: "Administratoriaus prisijungimas nebegalioja."
@@ -171,7 +178,11 @@ app.post("/api/admin/settings", requireAdmin, (req, res) => {
     if (req.body.maxPlayers !== undefined) {
         const amount = Number(req.body.maxPlayers);
 
-        if (Number.isInteger(amount) && amount >= 1 && amount <= 100) {
+        if (
+            Number.isInteger(amount) &&
+            amount >= 1 &&
+            amount <= 100
+        ) {
             settings.maxPlayers = amount;
         }
     }
@@ -223,6 +234,7 @@ io.on("connection", (socket) => {
         socket.emit("serverNotice", {
             message: "Serveris laikinai prižiūrimas."
         });
+
         socket.disconnect(true);
         return;
     }
@@ -231,6 +243,7 @@ io.on("connection", (socket) => {
         socket.emit("serverNotice", {
             message: "Serveris pilnas."
         });
+
         socket.disconnect(true);
         return;
     }
@@ -264,11 +277,20 @@ io.on("connection", (socket) => {
         const current = players.get(socket.id);
         if (!current) return;
 
-        current.username = cleanText(data.username, 18) || "Žaidėjas";
+        current.username =
+            cleanText(data.username, 18) || "Žaidėjas";
+
         current.color = cleanColor(data.color);
 
-        current.x = Math.max(-75, Math.min(75, Number(data.x) || 0));
-        current.z = Math.max(-75, Math.min(75, Number(data.z) || 0));
+        current.x = Math.max(
+            -75,
+            Math.min(75, Number(data.x) || 0)
+        );
+
+        current.z = Math.max(
+            -75,
+            Math.min(75, Number(data.z) || 0)
+        );
 
         current.rotation = Number.isFinite(Number(data.rotation))
             ? Number(data.rotation)
@@ -276,7 +298,10 @@ io.on("connection", (socket) => {
 
         current.equipment = cleanEquipment(data.equipment);
 
-        socket.broadcast.emit("playerMoved", publicPlayer(current));
+        socket.broadcast.emit(
+            "playerMoved",
+            publicPlayer(current)
+        );
     });
 
     socket.on("disconnect", () => {
@@ -292,5 +317,7 @@ io.on("connection", (socket) => {
 
 // START SERVER
 server.listen(PORT, "0.0.0.0", () => {
-    console.log(`Neo Shooter 3D server running on port ${PORT}`);
+    console.log(
+        `Neo Shooter 3D server running on port ${PORT}`
+    );
 });
