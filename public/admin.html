@@ -4,228 +4,431 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<meta name="theme-color" content="#080d1c">
-<title>Neo Shooter 3D Admin</title>
+<title>Neo Shooter 3D – Admin</title>
+
 <style>
-* { box-sizing: border-box; }
+* {
+    box-sizing: border-box;
+}
+
 body {
     margin: 0;
     padding: 20px;
-    background: #080d1c;
-    color: white;
+    background: #080d18;
+    color: #eafaff;
     font-family: Arial, sans-serif;
 }
-.container { max-width: 850px; margin: auto; }
-h1 { color: #00d9ff; }
-.card {
-    background: #141f38;
-    border: 1px solid #315b9d;
+
+.container {
+    max-width: 1000px;
+    margin: auto;
+}
+
+h1 {
+    color: #00eaff;
+    text-align: center;
+}
+
+h2 {
+    color: #00eaff;
+    font-size: 19px;
+}
+
+.panel {
+    background: #111c2e;
+    border: 1px solid #17445c;
     border-radius: 12px;
     padding: 18px;
     margin: 15px 0;
 }
-input, button {
-    padding: 12px;
-    margin: 5px 0;
-    border-radius: 7px;
-    border: 1px solid #42649c;
-}
-input {
+
+input, textarea, button {
     width: 100%;
-    background: #091326;
-    color: white;
-}
-button {
-    background: #087eb5;
-    color: white;
-    cursor: pointer;
-    font-weight: bold;
-}
-button:hover { background: #159edb; }
-.danger { background: #a52c45; }
-.row {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    gap: 10px;
-    flex-wrap: wrap;
-    padding: 10px 0;
-    border-bottom: 1px solid #30405f;
-}
-#dashboard { display: none; }
-#message { color: #00d9ff; }
-#loginMessage { color: #ff7185; }
-.game-button {
-    display: inline-block;
-    padding: 13px 20px;
-    margin: 8px 0;
+    padding: 12px;
+    margin-top: 10px;
     border-radius: 7px;
-    background: #087eb5;
-    color: white;
-    text-decoration: none;
-    font-weight: bold;
+    border: 1px solid #24536a;
+    font-size: 15px;
 }
-@media (max-width: 600px) {
-    body { padding: 12px; }
-    .card { padding: 14px; }
+
+input, textarea {
+    background: #081321;
+    color: white;
+}
+
+button {
+    background: #00bcd4;
+    color: #001018;
+    font-weight: bold;
+    cursor: pointer;
+}
+
+button:hover {
+    background: #55eaff;
+}
+
+.danger {
+    background: #d93650;
+    color: white;
+}
+
+.secondary {
+    background: #263c55;
+    color: white;
+}
+
+.hidden {
+    display: none;
+}
+
+.status {
+    padding: 12px;
+    background: #081321;
+    border-radius: 8px;
+    margin-top: 10px;
+    overflow-wrap: anywhere;
+}
+
+.player {
+    padding: 12px;
+    margin-top: 10px;
+    background: #081321;
+    border: 1px solid #24536a;
+    border-radius: 8px;
+}
+
+.player button {
+    margin-top: 8px;
+}
+
+.small {
+    color: #9bb6c5;
+    font-size: 13px;
+}
+
+#notice {
+    margin-top: 12px;
+    color: #55eaff;
+    overflow-wrap: anywhere;
 }
 </style>
 </head>
+
 <body>
+
 <div class="container">
-    <h1>NEO SHOOTER 3D</h1>
-    <p>ADMIN CONTROL PANEL</p>
 
-    <section id="login" class="card">
-        <h2>Admin Login</h2>
-        <input id="username" placeholder="Username" autocomplete="username">
-        <input id="password" type="password" placeholder="Password" autocomplete="current-password">
-        <button id="loginButton">LOGIN</button>
-        <p id="loginMessage"></p>
-    </section>
+<h1>NEO SHOOTER 3D</h1>
+<p style="text-align:center">ADMINISTRATORIAUS VALDYMO SKYDAS</p>
 
-    <section id="dashboard">
-        <div class="card">
-            <h2>Game</h2>
-            <a class="game-button" href="/" target="_blank" rel="noopener">OPEN GAME</a>
-        </div>
+<!-- LOGIN -->
+<div class="panel" id="loginPanel">
 
-        <div class="card">
-            <h2>Server Status</h2>
-            <p id="status">Loading...</p>
-            <button id="refreshButton">REFRESH</button>
-        </div>
+<h2>Administratoriaus prisijungimas</h2>
 
-        <div class="card">
-            <h2>Players</h2>
-            <div id="players">Loading...</div>
-        </div>
+<input
+    id="username"
+    type="text"
+    placeholder="Administratoriaus vardas"
+    autocomplete="username"
+>
 
-        <div class="card">
-            <h2>Server Message</h2>
-            <input id="announcement" maxlength="200" placeholder="Write a message">
-            <button id="sendMessage">SEND MESSAGE</button>
-        </div>
+<input
+    id="password"
+    type="password"
+    placeholder="Slaptažodis"
+    autocomplete="current-password"
+>
 
-        <div class="card">
-            <h2>Server Settings</h2>
-            <input id="serverName" maxlength="40" placeholder="Server name">
-            <input id="maxPlayers" type="number" min="1" max="100" value="20">
-            <label>
-                <input id="maintenance" type="checkbox" style="width:auto">
-                Maintenance mode
-            </label>
-            <br>
-            <button id="saveSettings">SAVE SETTINGS</button>
-        </div>
+<button id="loginButton">PRISIJUNGTI</button>
 
-        <div class="card">
-            <button id="logoutButton" class="danger">LOGOUT</button>
-        </div>
-    </section>
+<div id="loginMessage"></div>
 
-    <p id="message"></p>
+</div>
+
+<!-- ADMIN PANEL -->
+<div id="adminPanel" class="hidden">
+
+<div class="panel">
+
+<h2>Serverio informacija</h2>
+
+<div class="status">
+    <p id="serverStatus">Tikrinama...</p>
+    <p id="onlinePlayers">Žaidėjai: 0</p>
+    <p id="serverName">Serveris: Neo Shooter 3D</p>
+    <p id="maintenanceStatus">Priežiūra: išjungta</p>
+</div>
+
+<button id="refreshButton">ATNAUJINTI INFORMACIJĄ</button>
+
+</div>
+
+<!-- PLAYERS -->
+<div class="panel">
+
+<h2>Žaidėjų valdymas</h2>
+
+<div id="playersList">
+    Žaidėjų sąrašas dar neįkeltas.
+</div>
+
+<button id="playersButton">ATNAUJINTI ŽAIDĖJUS</button>
+
+</div>
+
+<!-- MESSAGE -->
+<div class="panel">
+
+<h2>Pranešimas žaidėjams</h2>
+
+<textarea
+    id="adminMessage"
+    rows="3"
+    maxlength="200"
+    placeholder="Įrašyk pranešimą..."
+></textarea>
+
+<button id="sendMessageButton">SIŲSTI PRANEŠIMĄ</button>
+
+</div>
+
+<!-- SETTINGS -->
+<div class="panel">
+
+<h2>Serverio nustatymai</h2>
+
+<label>Serverio pavadinimas</label>
+
+<input
+    id="settingName"
+    type="text"
+    maxlength="40"
+    placeholder="Neo Shooter 3D"
+>
+
+<label>Didžiausias žaidėjų skaičius</label>
+
+<input
+    id="settingPlayers"
+    type="number"
+    min="1"
+    max="100"
+    value="20"
+>
+
+<label style="display:block;margin-top:15px">
+    <input
+        id="settingMaintenance"
+        type="checkbox"
+        style="width:auto"
+    >
+    Įjungti techninės priežiūros režimą
+</label>
+
+<button id="saveSettingsButton">IŠSAUGOTI NUSTATYMUS</button>
+
+</div>
+
+<!-- LOGOUT -->
+<div class="panel">
+
+<button class="danger" id="logoutButton">
+    ATSIJUNGTI
+</button>
+
+</div>
+
+</div>
+
+<div id="notice"></div>
+
 </div>
 
 <script>
-let token = "";
-const $ = id => document.getElementById(id);
+"use strict";
+
+const loginPanel = document.getElementById("loginPanel");
+const adminPanel = document.getElementById("adminPanel");
+const notice = document.getElementById("notice");
+
+let adminToken = sessionStorage.getItem("neoAdminToken");
+
+function showNotice(message) {
+    notice.textContent = message;
+}
 
 async function api(url, options = {}) {
+    const headers = {
+        ...(options.headers || {}),
+        "Content-Type": "application/json"
+    };
+
+    if (adminToken) {
+        headers.Authorization = "Bearer " + adminToken;
+    }
+
     const response = await fetch(url, {
         ...options,
-        headers: {
-            "Content-Type": "application/json",
-            ...(token ? { Authorization: "Bearer " + token } : {}),
-            ...(options.headers || {})
-        }
+        headers
     });
 
-    const data = await response.json().catch(() => ({}));
+    let data = {};
+
+    try {
+        data = await response.json();
+    } catch {
+        throw new Error("Serveris grąžino netinkamą atsakymą.");
+    }
 
     if (!response.ok) {
-        throw new Error(data.message || data.error || "Request failed");
+        if (response.status === 401) {
+            logout(false);
+        }
+
+        throw new Error(data.message || "Įvyko klaida.");
     }
 
     return data;
 }
 
-function showMessage(text) {
-    $("message").textContent = text;
-}
-
+// LOGIN
 async function login() {
-    $("loginMessage").textContent = "";
+    const username =
+        document.getElementById("username").value.trim();
+
+    const password =
+        document.getElementById("password").value;
+
+    const message =
+        document.getElementById("loginMessage");
+
+    message.textContent = "Jungiamasi...";
 
     try {
-        const data = await api("/api/admin/login", {
+        const response = await fetch("/api/admin/login", {
             method: "POST",
+            headers: {
+                "Content-Type": "application/json"
+            },
             body: JSON.stringify({
-                username: $("username").value,
-                password: $("password").value
+                username,
+                password
             })
         });
 
-        token = data.token;
-        $("login").style.display = "none";
-        $("dashboard").style.display = "block";
-        $("password").value = "";
+        const data = await response.json();
 
-        await refreshDashboard();
+        if (!response.ok) {
+            throw new Error(data.message || "Prisijungti nepavyko.");
+        }
+
+        adminToken = data.token;
+
+        sessionStorage.setItem(
+            "neoAdminToken",
+            adminToken
+        );
+
+        openAdmin();
+
     } catch (error) {
-        $("loginMessage").textContent = error.message;
+        message.textContent = error.message;
     }
 }
 
-async function refreshDashboard() {
+// OPEN ADMIN
+function openAdmin() {
+    loginPanel.classList.add("hidden");
+    adminPanel.classList.remove("hidden");
+
+    showNotice("Administratoriaus skydas atidarytas.");
+
+    loadStatus();
+    loadPlayers();
+}
+
+// SERVER STATUS
+async function loadStatus() {
     try {
-        const status = await api("/api/status");
+        const data = await api("/api/status");
 
-        $("status").textContent =
-            "Online players: " + status.players +
-            " | Server: " + status.settings.serverName +
-            " | Max players: " + status.settings.maxPlayers +
-            " | Maintenance: " +
-            (status.settings.maintenance ? "ON" : "OFF");
+        document.getElementById("serverStatus").textContent =
+            "Būsena: " + data.status;
 
-        $("serverName").value = status.settings.serverName;
-        $("maxPlayers").value = status.settings.maxPlayers;
-        $("maintenance").checked = status.settings.maintenance;
+        document.getElementById("onlinePlayers").textContent =
+            "Žaidėjai: " + data.players;
 
-        const result = await api("/api/players");
-        const players = result.players || [];
-        const container = $("players");
+        document.getElementById("serverName").textContent =
+            "Serveris: " + data.settings.serverName;
 
-        container.replaceChildren();
+        document.getElementById("maintenanceStatus").textContent =
+            "Priežiūra: " +
+            (data.settings.maintenance ? "įjungta" : "išjungta");
 
-        if (players.length === 0) {
-            container.textContent = "No players online.";
+        document.getElementById("settingName").value =
+            data.settings.serverName;
+
+        document.getElementById("settingPlayers").value =
+            data.settings.maxPlayers;
+
+        document.getElementById("settingMaintenance").checked =
+            data.settings.maintenance;
+
+    } catch (error) {
+        showNotice(error.message);
+    }
+}
+
+// PLAYERS
+async function loadPlayers() {
+    const list = document.getElementById("playersList");
+
+    list.textContent = "Kraunamas žaidėjų sąrašas...";
+
+    try {
+        const data = await api("/api/players");
+
+        list.replaceChildren();
+
+        if (!data.players || data.players.length === 0) {
+            list.textContent = "Šiuo metu žaidėjų nėra.";
             return;
         }
 
-        players.forEach(player => {
-            const row = document.createElement("div");
-            row.className = "row";
+        data.players.forEach(player => {
+            const item = document.createElement("div");
+            item.className = "player";
 
-            const name = document.createElement("span");
-            name.textContent =
-                player.username + " (" + player.id + ")";
+            const name = document.createElement("strong");
+            name.textContent = player.username;
 
-            const ban = document.createElement("button");
-            ban.className = "danger";
-            ban.textContent = "BLOCK";
-            ban.addEventListener("click", () => blockPlayer(player.id));
+            const id = document.createElement("p");
+            id.className = "small";
+            id.textContent = "ID: " + player.id;
 
-            row.append(name, ban);
-            container.appendChild(row);
+            const kickButton = document.createElement("button");
+            kickButton.className = "danger";
+            kickButton.textContent = "ATJUNGTI ŽAIDĖJĄ";
+
+            kickButton.addEventListener("click", () => {
+                kickPlayer(player.id);
+            });
+
+            item.append(name, id, kickButton);
+            list.appendChild(item);
         });
+
     } catch (error) {
-        showMessage(error.message);
+        list.textContent = error.message;
     }
 }
 
-async function blockPlayer(id) {
-    if (!confirm("Block this player?")) return;
+// KICK PLAYER
+async function kickPlayer(id) {
+    if (!confirm("Ar tikrai nori atjungti šį žaidėją?")) {
+        return;
+    }
 
     try {
         await api("/api/admin/ban", {
@@ -233,72 +436,138 @@ async function blockPlayer(id) {
             body: JSON.stringify({ id })
         });
 
-        showMessage("Player blocked.");
-        await refreshDashboard();
+        showNotice("Žaidėjas atjungtas.");
+
+        loadPlayers();
+        loadStatus();
+
     } catch (error) {
-        showMessage(error.message);
+        showNotice(error.message);
     }
 }
 
+// SEND MESSAGE
 async function sendMessage() {
+    const message =
+        document.getElementById("adminMessage").value.trim();
+
+    if (!message) {
+        showNotice("Įrašyk pranešimą.");
+        return;
+    }
+
     try {
         await api("/api/admin/message", {
             method: "POST",
-            body: JSON.stringify({
-                message: $("announcement").value
-            })
+            body: JSON.stringify({ message })
         });
 
-        $("announcement").value = "";
-        showMessage("Message sent.");
+        document.getElementById("adminMessage").value = "";
+
+        showNotice("Pranešimas išsiųstas žaidėjams.");
+
     } catch (error) {
-        showMessage(error.message);
+        showNotice(error.message);
     }
 }
 
+// SAVE SETTINGS
 async function saveSettings() {
+    const serverName =
+        document.getElementById("settingName").value.trim();
+
+    const maxPlayers = Number(
+        document.getElementById("settingPlayers").value
+    );
+
+    const maintenance =
+        document.getElementById("settingMaintenance").checked;
+
+    if (
+        !serverName ||
+        !Number.isInteger(maxPlayers) ||
+        maxPlayers < 1 ||
+        maxPlayers > 100
+    ) {
+        showNotice("Patikrink serverio nustatymus.");
+        return;
+    }
+
     try {
-        const maxPlayers = Number($("maxPlayers").value);
-
-        if (!Number.isInteger(maxPlayers) ||
-            maxPlayers < 1 || maxPlayers > 100) {
-            throw new Error("Max players must be between 1 and 100.");
-        }
-
         await api("/api/admin/settings", {
             method: "POST",
             body: JSON.stringify({
-                serverName: $("serverName").value,
+                serverName,
                 maxPlayers,
-                maintenance: $("maintenance").checked
+                maintenance
             })
         });
 
-        showMessage("Settings saved.");
-        await refreshDashboard();
+        showNotice("Nustatymai išsaugoti.");
+
+        loadStatus();
+
     } catch (error) {
-        showMessage(error.message);
+        showNotice(error.message);
     }
 }
 
-async function logout() {
-    try {
-        await api("/api/admin/logout", { method: "POST" });
-    } catch (error) {
-        // Session may already have expired.
+// LOGOUT
+async function logout(sendRequest = true) {
+    if (sendRequest && adminToken) {
+        try {
+            await api("/api/admin/logout", {
+                method: "POST"
+            });
+        } catch {
+            // Token bus pašalintas ir vietoje.
+        }
     }
 
-    token = "";
-    $("dashboard").style.display = "none";
-    $("login").style.display = "block";
-    showMessage("Logged out.");
+    adminToken = null;
+
+    sessionStorage.removeItem("neoAdminToken");
+
+    adminPanel.classList.add("hidden");
+    loginPanel.classList.remove("hidden");
+
+    document.getElementById("password").value = "";
+
+    showNotice("Atsijungta.");
 }
 
-$("loginButton").addEventListener("click", login);
-$("refreshButton").addEventListener("click", refreshDashboard);
-$("sendMessage").addEventListener("click", sendMessage);
-$("saveSettings").addEventListener("click", saveSettings);
-$("logoutButton").addEventListener("click", logout);
+// BUTTONS
+document.getElementById("loginButton")
+    .addEventListener("click", login);
+
+document.getElementById("refreshButton")
+    .addEventListener("click", loadStatus);
+
+document.getElementById("playersButton")
+    .addEventListener("click", loadPlayers);
+
+document.getElementById("sendMessageButton")
+    .addEventListener("click", sendMessage);
+
+document.getElementById("saveSettingsButton")
+    .addEventListener("click", saveSettings);
+
+document.getElementById("logoutButton")
+    .addEventListener("click", () => logout());
+
+// ENTER LOGIN
+document.getElementById("password")
+    .addEventListener("keydown", event => {
+        if (event.key === "Enter") {
+            login();
+        }
+    });
+
+// CHECK SAVED SESSION
+if (adminToken) {
+    openAdmin();
+}
 </script>
+
 </body>
 </html>
