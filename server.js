@@ -1,4 +1,3 @@
-
 require("dotenv").config();
 
 const express = require("express");
@@ -20,6 +19,7 @@ const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD;
 
 const players = new Map();
 const adminTokens = new Map();
+const bannedPlayers = new Set();
 
 const settings = {
     serverName: "Neo Shooter 3D",
@@ -27,35 +27,37 @@ const settings = {
     maintenance: false
 };
 
-function cleanText(value, maxLength = 20) {
+// TEKSTO SAUGUMAS
+function cleanText(value, maxLength = 100) {
     return String(value || "")
         .replace(/[<>]/g, "")
         .trim()
         .slice(0, maxLength);
 }
 
+// SPALVOS SAUGUMAS
 function cleanColor(value) {
     const color = String(value || "#00eaff");
+
     return /^#[0-9a-fA-F]{6}$/.test(color)
         ? color
         : "#00eaff";
 }
 
+// ĮRANGOS SAUGUMAS
 function cleanEquipment(value) {
-    const allowedWeapons = ["neon", "gold", "ice", "purple", "red"];
-    const allowedShields = ["blue", "gold", "green", "purple"];
-    const allowedOutfits = ["default", "dark", "red", "gold"];
+    const weapons = ["neon", "gold", "ice", "purple", "red"];
+    const shields = ["blue", "gold", "green", "purple"];
+    const outfits = ["default", "dark", "red", "gold"];
 
     return {
-        weapon: allowedWeapons.includes(value?.weapon)
-            ? value.weapon : "neon",
-        shield: allowedShields.includes(value?.shield)
-            ? value.shield : "blue",
-        outfit: allowedOutfits.includes(value?.outfit)
-            ? value.outfit : "default"
+        weapon: weapons.includes(value?.weapon) ? value.weapon : "neon",
+        shield: shields.includes(value?.shield) ? value.shield : "blue",
+        outfit: outfits.includes(value?.outfit) ? value.outfit : "default"
     };
 }
 
+// VIEŠA ŽAIDĖJO INFORMACIJA
 function publicPlayer(player) {
     return {
         id: player.id,
@@ -68,6 +70,7 @@ function publicPlayer(player) {
     };
 }
 
+// ŽAIDĖJŲ ATNAUJINIMAS
 function broadcastPlayers() {
     io.emit(
         "playersUpdate",
@@ -75,18 +78,23 @@ function broadcastPlayers() {
     );
 }
 
-// ADMIN PAGE
+// ADMINISTRATORIAUS PUSLAPIS
 app.get("/admin", (req, res) => {
-    res.sendFile(path.join(__dirname, "admin.html"));
+    res.sendFile(path.join(__dirname, "public", "admin.html"));
 });
 
-// ADMIN AUTHENTICATION
+// ADMINISTRATORIAUS TOKEN TIKRINIMAS
 function requireAdmin(req, res, next) {
     const header = req.headers.authorization || "";
-    const token = header.startsWith("Bearer ")
-        ? header.slice(7)
-        : "";
 
+    if (!header.startsWith("Bearer ")) {
+        return res.status(401).json({
+            success: false,
+            message: "Reikia prisijungti."
+        });
+    }
+
+    const token = header.slice(7);
     const expires = adminTokens.get(token);
 
     if (!expires || expires < Date.now()) {
@@ -94,14 +102,14 @@ function requireAdmin(req, res, next) {
 
         return res.status(401).json({
             success: false,
-            message: "Administratoriaus prisijungimas nebegalioja."
+            message: "Prisijungimas nebegalioja."
         });
     }
 
     next();
 }
 
-// ADMIN LOGIN
+// ADMINISTRATORIAUS PRISIJUNGIMAS
 app.post("/api/admin/login", (req, res) => {
     const username = String(req.body.username || "");
     const password = String(req.body.password || "");
@@ -109,7 +117,7 @@ app.post("/api/admin/login", (req, res) => {
     if (!ADMIN_USERNAME || !ADMIN_PASSWORD) {
         return res.status(500).json({
             success: false,
-            message: "Render aplinkos kintamieji nesukonfigūruoti."
+            message: "Nesukonfigūruoti administratoriaus duomenys."
         });
     }
 
@@ -125,7 +133,10 @@ app.post("/api/admin/login", (req, res) => {
 
     const token = crypto.randomBytes(32).toString("hex");
 
-    adminTokens.set(token, Date.now() + 60 * 60 * 1000);
+    adminTokens.set(
+        token,
+        Date.now() + 60 * 60 * 1000
+    );
 
     res.json({
         success: true,
@@ -133,7 +144,7 @@ app.post("/api/admin/login", (req, res) => {
     });
 });
 
-// SERVER STATUS
+// SERVERIO BŪKLĖ
 app.get("/api/status", (req, res) => {
     res.json({
         status: "online",
@@ -142,14 +153,14 @@ app.get("/api/status", (req, res) => {
     });
 });
 
-// PLAYER LIST
+// ŽAIDĖJŲ SĄRAŠAS
 app.get("/api/players", requireAdmin, (req, res) => {
     res.json({
         players: Array.from(players.values()).map(publicPlayer)
     });
 });
 
-// ADMIN MESSAGE
+// ADMINISTRATORIAUS PRANEŠIMAS
 app.post("/api/admin/message", requireAdmin, (req, res) => {
     const message = cleanText(req.body.message, 200);
 
@@ -168,7 +179,7 @@ app.post("/api/admin/message", requireAdmin, (req, res) => {
     res.json({ success: true });
 });
 
-// SERVER SETTINGS
+// SERVERIO NUSTATYMAI
 app.post("/api/admin/settings", requireAdmin, (req, res) => {
     if (typeof req.body.serverName === "string") {
         settings.serverName =
@@ -197,12 +208,12 @@ app.post("/api/admin/settings", requireAdmin, (req, res) => {
     });
 });
 
-// BLOCK PLAYER
+// ATJUNGTI ŽAIDĖJĄ
 app.post("/api/admin/ban", requireAdmin, (req, res) => {
     const playerId = String(req.body.id || "");
     const socket = io.sockets.sockets.get(playerId);
 
-    if (!socket) {
+    if (!socket || !players.has(playerId)) {
         return res.status(404).json({
             success: false,
             message: "Žaidėjas nerastas."
@@ -218,17 +229,16 @@ app.post("/api/admin/ban", requireAdmin, (req, res) => {
     res.json({ success: true });
 });
 
-// ADMIN LOGOUT
+// ADMINISTRATORIAUS ATSIJUNGIMAS
 app.post("/api/admin/logout", requireAdmin, (req, res) => {
-    const header = req.headers.authorization || "";
-    const token = header.slice(7);
+    const token = req.headers.authorization.slice(7);
 
     adminTokens.delete(token);
 
     res.json({ success: true });
 });
 
-// MULTIPLAYER
+// ŽAIDĖJŲ SERVERIS
 io.on("connection", (socket) => {
     if (settings.maintenance) {
         socket.emit("serverNotice", {
@@ -271,10 +281,15 @@ io.on("connection", (socket) => {
             .map(publicPlayer)
     );
 
-    socket.broadcast.emit("playerJoined", publicPlayer(player));
+    socket.broadcast.emit(
+        "playerJoined",
+        publicPlayer(player)
+    );
 
+    // ŽAIDĖJO JUDĖJIMAS
     socket.on("playerMove", (data = {}) => {
         const current = players.get(socket.id);
+
         if (!current) return;
 
         current.username =
@@ -292,8 +307,10 @@ io.on("connection", (socket) => {
             Math.min(75, Number(data.z) || 0)
         );
 
-        current.rotation = Number.isFinite(Number(data.rotation))
-            ? Number(data.rotation)
+        const rotation = Number(data.rotation);
+
+        current.rotation = Number.isFinite(rotation)
+            ? Math.max(-1000, Math.min(1000, rotation))
             : 0;
 
         current.equipment = cleanEquipment(data.equipment);
@@ -304,6 +321,7 @@ io.on("connection", (socket) => {
         );
     });
 
+    // ATSIJUNGIMAS
     socket.on("disconnect", () => {
         players.delete(socket.id);
 
@@ -315,7 +333,18 @@ io.on("connection", (socket) => {
     });
 });
 
-// START SERVER
+// AUTOMATINIS SENŲ TOKEN VALYMAS
+setInterval(() => {
+    const now = Date.now();
+
+    for (const [token, expires] of adminTokens) {
+        if (expires < now) {
+            adminTokens.delete(token);
+        }
+    }
+}, 5 * 60 * 1000);
+
+// SERVERIO PALEIDIMAS
 server.listen(PORT, "0.0.0.0", () => {
     console.log(
         `Neo Shooter 3D server running on port ${PORT}`
