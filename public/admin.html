@@ -3,570 +3,338 @@
 <html lang="lt">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Neo Shooter 3D – Admin</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>NEO SHOOTER – ADMIN</title>
 
 <style>
-* {
-    box-sizing: border-box;
+*{box-sizing:border-box}
+body{
+ margin:0;
+ background:#070b15;
+ color:#eafaff;
+ font-family:Arial,sans-serif;
 }
-
-body {
-    margin: 0;
-    padding: 20px;
-    background: #080d18;
-    color: #eafaff;
-    font-family: Arial, sans-serif;
+header{
+ padding:20px;
+ background:#101b2e;
+ border-bottom:1px solid #00dfff;
 }
-
-.container {
-    max-width: 1000px;
-    margin: auto;
+header h1{color:#00eaff;margin:0}
+.layout{display:flex;min-height:100vh}
+nav{
+ width:230px;
+ background:#0c1424;
+ padding:15px;
 }
-
-h1 {
-    color: #00eaff;
-    text-align: center;
+nav button{
+ display:block;width:100%;
+ margin:8px 0;padding:14px;
+ background:#14243a;
+ color:white;border:1px solid #174b65;
+ border-radius:8px;text-align:left;
 }
-
-h2 {
-    color: #00eaff;
-    font-size: 19px;
+nav button:hover{background:#007f99}
+main{flex:1;padding:20px;min-width:0}
+.panel{
+ background:#101b2e;
+ border:1px solid #17445c;
+ border-radius:12px;
+ padding:20px;margin-bottom:18px;
 }
-
-.panel {
-    background: #111c2e;
-    border: 1px solid #17445c;
-    border-radius: 12px;
-    padding: 18px;
-    margin: 15px 0;
+h2{color:#00eaff}
+button{
+ cursor:pointer;font-weight:bold;
 }
-
-input, textarea, button {
-    width: 100%;
-    padding: 12px;
-    margin-top: 10px;
-    border-radius: 7px;
-    border: 1px solid #24536a;
-    font-size: 15px;
+.action{
+ width:100%;padding:14px;
+ background:#00cce8;color:#001018;
+ border:0;border-radius:8px;margin-top:10px;
 }
-
-input, textarea {
-    background: #081321;
-    color: white;
+.danger{background:#d93650;color:white}
+input,textarea{
+ width:100%;padding:12px;margin:8px 0;
+ background:#071321;color:white;
+ border:1px solid #24536a;border-radius:7px;
 }
-
-button {
-    background: #00bcd4;
-    color: #001018;
-    font-weight: bold;
-    cursor: pointer;
+.hidden{display:none!important}
+.stat{
+ background:#081321;padding:15px;
+ border-radius:8px;margin:8px 0;
 }
-
-button:hover {
-    background: #55eaff;
+.player{
+ background:#081321;padding:12px;
+ margin:10px 0;border-radius:8px;
 }
-
-.danger {
-    background: #d93650;
-    color: white;
-}
-
-.secondary {
-    background: #263c55;
-    color: white;
-}
-
-.hidden {
-    display: none;
-}
-
-.status {
-    padding: 12px;
-    background: #081321;
-    border-radius: 8px;
-    margin-top: 10px;
-    overflow-wrap: anywhere;
-}
-
-.player {
-    padding: 12px;
-    margin-top: 10px;
-    background: #081321;
-    border: 1px solid #24536a;
-    border-radius: 8px;
-}
-
-.player button {
-    margin-top: 8px;
-}
-
-.small {
-    color: #9bb6c5;
-    font-size: 13px;
-}
-
-#notice {
-    margin-top: 12px;
-    color: #55eaff;
-    overflow-wrap: anywhere;
+#notice{color:#00eaff;margin:12px 0}
+@media(max-width:650px){
+ .layout{display:block}
+ nav{width:100%;display:grid;grid-template-columns:1fr 1fr}
+ nav button{text-align:center;font-size:12px}
+ main{padding:12px}
 }
 </style>
 </head>
 
 <body>
 
-<div class="container">
-
+<header>
 <h1>NEO SHOOTER 3D</h1>
-<p style="text-align:center">ADMINISTRATORIAUS VALDYMO SKYDAS</p>
+<p>ADMIN CONTROL CENTER</p>
+</header>
 
-<!-- LOGIN -->
-<div class="panel" id="loginPanel">
+<div class="layout">
 
-<h2>Administratoriaus prisijungimas</h2>
+<nav id="menu">
+<button data-page="dashboard">📊 Dashboard</button>
+<button data-page="game">🎮 Žaisti</button>
+<button data-page="players">👥 Žaidėjai</button>
+<button data-page="messages">📢 Pranešimai</button>
+<button data-page="settings">⚙️ Nustatymai</button>
+<button id="logoutButton" class="danger">🚪 Atsijungti</button>
+</nav>
 
-<input
-    id="username"
-    type="text"
-    placeholder="Administratoriaus vardas"
-    autocomplete="username"
->
+<main>
 
-<input
-    id="password"
-    type="password"
-    placeholder="Slaptažodis"
-    autocomplete="current-password"
->
-
-<button id="loginButton">PRISIJUNGTI</button>
-
-<div id="loginMessage"></div>
-
+<div id="loginPanel" class="panel">
+<h2>ADMIN LOGIN</h2>
+<input id="username" placeholder="Administratoriaus vardas">
+<input id="password" type="password" placeholder="Slaptažodis">
+<button class="action" id="loginButton">PRISIJUNGTI</button>
+<p id="loginMessage"></p>
 </div>
 
-<!-- ADMIN PANEL -->
 <div id="adminPanel" class="hidden">
 
+<section id="dashboard" class="page">
 <div class="panel">
-
-<h2>Serverio informacija</h2>
-
-<div class="status">
-    <p id="serverStatus">Tikrinama...</p>
-    <p id="onlinePlayers">Žaidėjai: 0</p>
-    <p id="serverName">Serveris: Neo Shooter 3D</p>
-    <p id="maintenanceStatus">Priežiūra: išjungta</p>
+<h2>ADMIN DASHBOARD</h2>
+<div class="stat" id="serverStatus">Serveris: tikrinama...</div>
+<div class="stat" id="onlinePlayers">Žaidėjai: 0</div>
+<div class="stat" id="serverName">Neo Shooter 3D</div>
+<button class="action" id="refreshButton">ATNAUJINTI</button>
 </div>
+</section>
 
-<button id="refreshButton">ATNAUJINTI INFORMACIJĄ</button>
-
-</div>
-
-<!-- PLAYERS -->
+<section id="game" class="page hidden">
 <div class="panel">
-
-<h2>Žaidėjų valdymas</h2>
-
-<div id="playersList">
-    Žaidėjų sąrašas dar neįkeltas.
+<h2>🎮 NEO SHOOTER 3D</h2>
+<p>Atidaryk pagrindinį žaidimą ir žaisk kaip administratorius.</p>
+<button class="action" id="playGameButton">PALEISTI ŽAIDIMĄ</button>
 </div>
+</section>
 
-<button id="playersButton">ATNAUJINTI ŽAIDĖJUS</button>
-
-</div>
-
-<!-- MESSAGE -->
+<section id="players" class="page hidden">
 <div class="panel">
-
-<h2>Pranešimas žaidėjams</h2>
-
-<textarea
-    id="adminMessage"
-    rows="3"
-    maxlength="200"
-    placeholder="Įrašyk pranešimą..."
-></textarea>
-
-<button id="sendMessageButton">SIŲSTI PRANEŠIMĄ</button>
-
+<h2>👥 ŽAIDĖJŲ VALDYMAS</h2>
+<div id="playersList">Žaidėjų sąrašas neįkeltas.</div>
+<button class="action" id="playersButton">ATNAUJINTI ŽAIDĖJUS</button>
 </div>
+</section>
 
-<!-- SETTINGS -->
+<section id="messages" class="page hidden">
 <div class="panel">
-
-<h2>Serverio nustatymai</h2>
-
-<label>Serverio pavadinimas</label>
-
-<input
-    id="settingName"
-    type="text"
-    maxlength="40"
-    placeholder="Neo Shooter 3D"
->
-
-<label>Didžiausias žaidėjų skaičius</label>
-
-<input
-    id="settingPlayers"
-    type="number"
-    min="1"
-    max="100"
-    value="20"
->
-
-<label style="display:block;margin-top:15px">
-    <input
-        id="settingMaintenance"
-        type="checkbox"
-        style="width:auto"
-    >
-    Įjungti techninės priežiūros režimą
-</label>
-
-<button id="saveSettingsButton">IŠSAUGOTI NUSTATYMUS</button>
-
+<h2>📢 PRANEŠIMAI</h2>
+<textarea id="adminMessage" placeholder="Pranešimas žaidėjams"></textarea>
+<button class="action" id="sendMessageButton">SIŲSTI</button>
 </div>
+</section>
 
-<!-- LOGOUT -->
+<section id="settings" class="page hidden">
 <div class="panel">
-
-<button class="danger" id="logoutButton">
-    ATSIJUNGTI
-</button>
-
+<h2>⚙️ SERVERIO NUSTATYMAI</h2>
+<input id="settingName" placeholder="Serverio pavadinimas">
+<input id="settingPlayers" type="number" min="1" max="100" value="20">
+<label><input id="settingMaintenance" type="checkbox" style="width:auto"> Techninė priežiūra</label>
+<button class="action" id="saveSettingsButton">IŠSAUGOTI</button>
 </div>
+</section>
 
 </div>
 
 <div id="notice"></div>
 
+</main>
 </div>
 
 <script>
 "use strict";
 
-const loginPanel = document.getElementById("loginPanel");
-const adminPanel = document.getElementById("adminPanel");
-const notice = document.getElementById("notice");
+const $ = id => document.getElementById(id);
 
 let adminToken = sessionStorage.getItem("neoAdminToken");
 
-function showNotice(message) {
-    notice.textContent = message;
+function notice(message){
+ $("notice").textContent=message;
 }
 
-async function api(url, options = {}) {
-    const headers = {
-        ...(options.headers || {}),
-        "Content-Type": "application/json"
-    };
-
-    if (adminToken) {
-        headers.Authorization = "Bearer " + adminToken;
-    }
-
-    const response = await fetch(url, {
-        ...options,
-        headers
-    });
-
-    let data = {};
-
-    try {
-        data = await response.json();
-    } catch {
-        throw new Error("Serveris grąžino netinkamą atsakymą.");
-    }
-
-    if (!response.ok) {
-        if (response.status === 401) {
-            logout(false);
-        }
-
-        throw new Error(data.message || "Įvyko klaida.");
-    }
-
-    return data;
+function showPage(page){
+ document.querySelectorAll(".page").forEach(p=>{
+  p.classList.add("hidden");
+ });
+ $(page).classList.remove("hidden");
 }
 
-// LOGIN
-async function login() {
-    const username =
-        document.getElementById("username").value.trim();
+async function api(url,options={}){
+ const headers={
+  "Content-Type":"application/json",
+  ...(options.headers||{})
+ };
+ if(adminToken) headers.Authorization="Bearer "+adminToken;
 
-    const password =
-        document.getElementById("password").value;
+ const response=await fetch(url,{...options,headers});
+ const data=await response.json();
 
-    const message =
-        document.getElementById("loginMessage");
-
-    message.textContent = "Jungiamasi...";
-
-    try {
-        const response = await fetch("/api/admin/login", {
-            method: "POST",
-            headers: {
-                "Content-Type": "application/json"
-            },
-            body: JSON.stringify({
-                username,
-                password
-            })
-        });
-
-        const data = await response.json();
-
-        if (!response.ok) {
-            throw new Error(data.message || "Prisijungti nepavyko.");
-        }
-
-        adminToken = data.token;
-
-        sessionStorage.setItem(
-            "neoAdminToken",
-            adminToken
-        );
-
-        openAdmin();
-
-    } catch (error) {
-        message.textContent = error.message;
-    }
+ if(!response.ok) throw new Error(data.message||"Serverio klaida");
+ return data;
 }
 
-// OPEN ADMIN
-function openAdmin() {
-    loginPanel.classList.add("hidden");
-    adminPanel.classList.remove("hidden");
+async function login(){
+ $("loginMessage").textContent="Jungiamasi...";
+ try{
+  const response=await fetch("/api/admin/login",{
+   method:"POST",
+   headers:{"Content-Type":"application/json"},
+   body:JSON.stringify({
+    username:$("username").value.trim(),
+    password:$("password").value
+   })
+  });
 
-    showNotice("Administratoriaus skydas atidarytas.");
+  const data=await response.json();
+  if(!response.ok) throw new Error(data.message||"Klaida");
 
-    loadStatus();
-    loadPlayers();
+  adminToken=data.token;
+  sessionStorage.setItem("neoAdminToken",adminToken);
+  openAdmin();
+ }catch(e){
+  $("loginMessage").textContent=e.message;
+ }
 }
 
-// SERVER STATUS
-async function loadStatus() {
-    try {
-        const data = await api("/api/status");
-
-        document.getElementById("serverStatus").textContent =
-            "Būsena: " + data.status;
-
-        document.getElementById("onlinePlayers").textContent =
-            "Žaidėjai: " + data.players;
-
-        document.getElementById("serverName").textContent =
-            "Serveris: " + data.settings.serverName;
-
-        document.getElementById("maintenanceStatus").textContent =
-            "Priežiūra: " +
-            (data.settings.maintenance ? "įjungta" : "išjungta");
-
-        document.getElementById("settingName").value =
-            data.settings.serverName;
-
-        document.getElementById("settingPlayers").value =
-            data.settings.maxPlayers;
-
-        document.getElementById("settingMaintenance").checked =
-            data.settings.maintenance;
-
-    } catch (error) {
-        showNotice(error.message);
-    }
+function openAdmin(){
+ $("loginPanel").classList.add("hidden");
+ $("adminPanel").classList.remove("hidden");
+ showPage("dashboard");
+ loadStatus();
+ loadPlayers();
 }
 
-// PLAYERS
-async function loadPlayers() {
-    const list = document.getElementById("playersList");
-
-    list.textContent = "Kraunamas žaidėjų sąrašas...";
-
-    try {
-        const data = await api("/api/players");
-
-        list.replaceChildren();
-
-        if (!data.players || data.players.length === 0) {
-            list.textContent = "Šiuo metu žaidėjų nėra.";
-            return;
-        }
-
-        data.players.forEach(player => {
-            const item = document.createElement("div");
-            item.className = "player";
-
-            const name = document.createElement("strong");
-            name.textContent = player.username;
-
-            const id = document.createElement("p");
-            id.className = "small";
-            id.textContent = "ID: " + player.id;
-
-            const kickButton = document.createElement("button");
-            kickButton.className = "danger";
-            kickButton.textContent = "ATJUNGTI ŽAIDĖJĄ";
-
-            kickButton.addEventListener("click", () => {
-                kickPlayer(player.id);
-            });
-
-            item.append(name, id, kickButton);
-            list.appendChild(item);
-        });
-
-    } catch (error) {
-        list.textContent = error.message;
-    }
+async function loadStatus(){
+ try{
+  const d=await api("/api/status");
+  $("serverStatus").textContent="Serveris: "+d.status;
+  $("onlinePlayers").textContent="Žaidėjai: "+d.players;
+  $("serverName").textContent="Serveris: "+d.settings.serverName;
+  $("settingName").value=d.settings.serverName;
+  $("settingPlayers").value=d.settings.maxPlayers;
+  $("settingMaintenance").checked=d.settings.maintenance;
+ }catch(e){notice(e.message)}
 }
 
-// KICK PLAYER
-async function kickPlayer(id) {
-    if (!confirm("Ar tikrai nori atjungti šį žaidėją?")) {
-        return;
-    }
+async function loadPlayers(){
+ try{
+  const d=await api("/api/players");
+  const list=$("playersList");
+  list.replaceChildren();
 
-    try {
-        await api("/api/admin/ban", {
-            method: "POST",
-            body: JSON.stringify({ id })
-        });
+  if(!d.players?.length){
+   list.textContent="Žaidėjų nėra.";
+   return;
+  }
 
-        showNotice("Žaidėjas atjungtas.");
-
-        loadPlayers();
-        loadStatus();
-
-    } catch (error) {
-        showNotice(error.message);
-    }
+  d.players.forEach(player=>{
+   const item=document.createElement("div");
+   item.className="player";
+   const name=document.createElement("strong");
+   name.textContent=player.username;
+   const kick=document.createElement("button");
+   kick.className="action danger";
+   kick.textContent="ATJUNGTI";
+   kick.onclick=()=>kickPlayer(player.id);
+   item.append(name,kick);
+   list.append(item);
+  });
+ }catch(e){
+  $("playersList").textContent=e.message;
+ }
 }
 
-// SEND MESSAGE
-async function sendMessage() {
-    const message =
-        document.getElementById("adminMessage").value.trim();
-
-    if (!message) {
-        showNotice("Įrašyk pranešimą.");
-        return;
-    }
-
-    try {
-        await api("/api/admin/message", {
-            method: "POST",
-            body: JSON.stringify({ message })
-        });
-
-        document.getElementById("adminMessage").value = "";
-
-        showNotice("Pranešimas išsiųstas žaidėjams.");
-
-    } catch (error) {
-        showNotice(error.message);
-    }
+async function kickPlayer(id){
+ if(!confirm("Atjungti žaidėją?"))return;
+ try{
+  await api("/api/admin/ban",{
+   method:"POST",
+   body:JSON.stringify({id})
+  });
+  notice("Žaidėjas atjungtas.");
+  loadPlayers();
+  loadStatus();
+ }catch(e){notice(e.message)}
 }
 
-// SAVE SETTINGS
-async function saveSettings() {
-    const serverName =
-        document.getElementById("settingName").value.trim();
-
-    const maxPlayers = Number(
-        document.getElementById("settingPlayers").value
-    );
-
-    const maintenance =
-        document.getElementById("settingMaintenance").checked;
-
-    if (
-        !serverName ||
-        !Number.isInteger(maxPlayers) ||
-        maxPlayers < 1 ||
-        maxPlayers > 100
-    ) {
-        showNotice("Patikrink serverio nustatymus.");
-        return;
-    }
-
-    try {
-        await api("/api/admin/settings", {
-            method: "POST",
-            body: JSON.stringify({
-                serverName,
-                maxPlayers,
-                maintenance
-            })
-        });
-
-        showNotice("Nustatymai išsaugoti.");
-
-        loadStatus();
-
-    } catch (error) {
-        showNotice(error.message);
-    }
+async function sendMessage(){
+ const message=$("adminMessage").value.trim();
+ if(!message)return notice("Įrašyk pranešimą.");
+ try{
+  await api("/api/admin/message",{
+   method:"POST",
+   body:JSON.stringify({message})
+  });
+  $("adminMessage").value="";
+  notice("Pranešimas išsiųstas.");
+ }catch(e){notice(e.message)}
 }
 
-// LOGOUT
-async function logout(sendRequest = true) {
-    if (sendRequest && adminToken) {
-        try {
-            await api("/api/admin/logout", {
-                method: "POST"
-            });
-        } catch {
-            // Token bus pašalintas ir vietoje.
-        }
-    }
+async function saveSettings(){
+ const serverName=$("settingName").value.trim();
+ const maxPlayers=Number($("settingPlayers").value);
+ const maintenance=$("settingMaintenance").checked;
 
-    adminToken = null;
+ if(!serverName||!Number.isInteger(maxPlayers)||maxPlayers<1||maxPlayers>100){
+  return notice("Netinkami nustatymai.");
+ }
 
-    sessionStorage.removeItem("neoAdminToken");
-
-    adminPanel.classList.add("hidden");
-    loginPanel.classList.remove("hidden");
-
-    document.getElementById("password").value = "";
-
-    showNotice("Atsijungta.");
+ try{
+  await api("/api/admin/settings",{
+   method:"POST",
+   body:JSON.stringify({serverName,maxPlayers,maintenance})
+  });
+  notice("Nustatymai išsaugoti.");
+  loadStatus();
+ }catch(e){notice(e.message)}
 }
 
-// BUTTONS
-document.getElementById("loginButton")
-    .addEventListener("click", login);
-
-document.getElementById("refreshButton")
-    .addEventListener("click", loadStatus);
-
-document.getElementById("playersButton")
-    .addEventListener("click", loadPlayers);
-
-document.getElementById("sendMessageButton")
-    .addEventListener("click", sendMessage);
-
-document.getElementById("saveSettingsButton")
-    .addEventListener("click", saveSettings);
-
-document.getElementById("logoutButton")
-    .addEventListener("click", () => logout());
-
-// ENTER LOGIN
-document.getElementById("password")
-    .addEventListener("keydown", event => {
-        if (event.key === "Enter") {
-            login();
-        }
-    });
-
-// CHECK SAVED SESSION
-if (adminToken) {
-    openAdmin();
+async function logout(){
+ try{
+  if(adminToken) await api("/api/admin/logout",{method:"POST"});
+ }catch(e){}
+ adminToken=null;
+ sessionStorage.removeItem("neoAdminToken");
+ $("adminPanel").classList.add("hidden");
+ $("loginPanel").classList.remove("hidden");
+ $("password").value="";
 }
+
+document.querySelectorAll("[data-page]").forEach(button=>{
+ button.addEventListener("click",()=>{
+  showPage(button.dataset.page);
+  if(button.dataset.page==="players")loadPlayers();
+  if(button.dataset.page==="dashboard")loadStatus();
+ });
+});
+
+$("loginButton").onclick=login;
+$("refreshButton").onclick=loadStatus;
+$("playersButton").onclick=loadPlayers;
+$("sendMessageButton").onclick=sendMessage;
+$("saveSettingsButton").onclick=saveSettings;
+$("logoutButton").onclick=logout;
+
+$("playGameButton").onclick=()=>{
+ window.open("/","_blank");
+};
+
+if(adminToken)openAdmin();
 </script>
 
 </body>
