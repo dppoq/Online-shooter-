@@ -1,7 +1,8 @@
+ 
 import * as THREE from "https://cdn.jsdelivr.net/npm/three@0.180.0/build/three.module.js";
 
 // =====================================
-// NEO SHOOTER 3D
+// NEO SHOOTER 3D - NEW VERSION
 // =====================================
 
 const menu = document.getElementById("menu");
@@ -14,11 +15,12 @@ const announcement = document.getElementById("adminAnnouncement");
 const serverStatus = document.getElementById("serverStatus");
 const menuPanel = document.getElementById("menuPanel");
 
-let socket = null;
 let scene = null;
 let camera = null;
 let renderer = null;
 let player = null;
+let socket = null;
+
 let gameRunning = false;
 let animationId = null;
 let previousTime = 0;
@@ -33,18 +35,24 @@ const keys = {
     right: false
 };
 
-const savedEquipment = JSON.parse(
-    localStorage.getItem("neoEquipment") || "{}"
-);
-
-const equipment = {
-    weapon: savedEquipment.weapon || "neon",
-    shield: savedEquipment.shield || "blue",
-    outfit: savedEquipment.outfit || "default"
-};
-
 let playerName = localStorage.getItem("neoUsername") || "Žaidėjas";
 let playerColor = localStorage.getItem("neoColor") || "#00eaff";
+
+let equipment = {
+    weapon: "neon",
+    shield: "blue",
+    outfit: "default"
+};
+
+try {
+    const saved = JSON.parse(
+        localStorage.getItem("neoEquipment") || "{}"
+    );
+
+    equipment = { ...equipment, ...saved };
+} catch (error) {
+    console.warn("Equipment settings could not be loaded.");
+}
 
 const colors = {
     weapon: {
@@ -69,11 +77,35 @@ const colors = {
 };
 
 // =====================================
+// HELPERS
+// =====================================
+
+function setServerStatus(message) {
+    if (serverStatus) {
+        serverStatus.textContent = message;
+    }
+}
+
+function updateOnlineCount() {
+    if (onlinePlayers) {
+        onlinePlayers.textContent =
+            "Online: " + (socket?.connected ? otherPlayers.size + 1 : 0);
+    }
+}
+
+function cleanName(value) {
+    return String(value || "Žaidėjas")
+        .replace(/[<>]/g, "")
+        .trim()
+        .slice(0, 18) || "Žaidėjas";
+}
+
+// =====================================
 // SERVER CONNECTION
 // =====================================
 
 function connectServer() {
-    if (socket && socket.connected) return;
+    if (socket?.connected) return;
 
     if (typeof window.io !== "function") {
         setServerStatus("Serverio biblioteka nepasiekiama");
@@ -95,7 +127,7 @@ function connectServer() {
         });
 
         socket.on("connect_error", () => {
-            setServerStatus("Offline – žaidimas veikia lokaliai");
+            setServerStatus("Server offline");
         });
 
         socket.on("disconnect", () => {
@@ -103,13 +135,14 @@ function connectServer() {
             updateOnlineCount();
         });
 
-        socket.on("playersUpdate", (players) => {
+        socket.on("playersUpdate", players => {
             if (!Array.isArray(players)) return;
 
             const received = new Set();
 
             players.forEach(data => {
                 if (!data || data.id === socket.id) return;
+
                 received.add(data.id);
                 addOtherPlayer(data);
             });
@@ -156,12 +189,6 @@ function connectServer() {
     }
 }
 
-function setServerStatus(message) {
-    if (serverStatus) {
-        serverStatus.textContent = message;
-    }
-}
-
 function sendPlayerUpdate() {
     if (!socket?.connected || !player) return;
 
@@ -175,21 +202,14 @@ function sendPlayerUpdate() {
     });
 }
 
-function updateOnlineCount() {
-    if (!onlinePlayers) return;
-
-    onlinePlayers.textContent =
-        "Online: " + (socket?.connected ? otherPlayers.size + 1 : 0);
-}
-
 // =====================================
-// WORLD
+// 3D WORLD
 // =====================================
 
 function createWorld() {
     scene = new THREE.Scene();
     scene.background = new THREE.Color(0x071426);
-    scene.fog = new THREE.Fog(0x071426, 35, 150);
+    scene.fog = new THREE.Fog(0x071426, 40, 160);
 
     camera = new THREE.PerspectiveCamera(
         65,
@@ -198,20 +218,43 @@ function createWorld() {
         300
     );
 
-    renderer = new THREE.WebGLRenderer({ antialias: true });
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer = new THREE.WebGLRenderer({
+        antialias: true
+    });
+
+    renderer.setPixelRatio(
+        Math.min(window.devicePixelRatio, 2)
+    );
+
+    renderer.setSize(
+        window.innerWidth,
+        window.innerHeight
+    );
+
     renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
     gameElement.appendChild(renderer.domElement);
 
-    scene.add(new THREE.HemisphereLight(0xb9eaff, 0x182030, 2));
+    // Lighting
+    scene.add(
+        new THREE.HemisphereLight(
+            0xb9eaff,
+            0x182030,
+            2
+        )
+    );
 
-    const sunlight = new THREE.DirectionalLight(0xffffff, 2);
+    const sunlight = new THREE.DirectionalLight(
+        0xffffff,
+        2
+    );
+
     sunlight.position.set(20, 35, 20);
     sunlight.castShadow = true;
     scene.add(sunlight);
 
+    // Ground
     const ground = new THREE.Mesh(
         new THREE.PlaneGeometry(180, 180),
         new THREE.MeshStandardMaterial({
@@ -224,61 +267,88 @@ function createWorld() {
     ground.receiveShadow = true;
     scene.add(ground);
 
+    // Neon grid
     const grid = new THREE.GridHelper(
-        180, 90, 0x087caa, 0x243c50
+        180,
+        90,
+        0x087caa,
+        0x243c50
     );
+
     grid.position.y = 0.02;
     scene.add(grid);
 
-    createRoad(0, 0, 180, 9);
-    createRoad(0, 0, 9, 180);
+    // Roads
+    createRoad(0, 0, 180, 10);
+    createRoad(0, 0, 10, 180);
 
-    for (let x = -65; x <= 65; x += 22) {
-        for (let z = -65; z <= 65; z += 22) {
-            if (Math.abs(x) < 15 || Math.abs(z) < 15) continue;
+    // City buildings
+    for (let x = -66; x <= 66; x += 22) {
+        for (let z = -66; z <= 66; z += 22) {
+            if (Math.abs(x) < 15 || Math.abs(z) < 15) {
+                continue;
+            }
+
             createBuilding(x, z);
         }
     }
 
-    for (let i = 0; i < 18; i++) {
+    // Neon street lights
+    for (let i = 0; i < 24; i++) {
         const light = new THREE.PointLight(
             i % 2 === 0 ? 0x00ccff : 0xaa44ff,
             2,
-            18
+            20
         );
 
         light.position.set(
             Math.random() * 120 - 60,
-            4,
+            5,
             Math.random() * 120 - 60
         );
 
         scene.add(light);
     }
 
+    // Player
     player = createAvatar(playerColor, equipment);
     scene.add(player);
 
     window.addEventListener("resize", resizeGame);
 }
 
+// =====================================
+// ROADS
+// =====================================
+
 function createRoad(x, z, width, height) {
     const road = new THREE.Mesh(
         new THREE.PlaneGeometry(width, height),
-        new THREE.MeshStandardMaterial({ color: 0x101923 })
+        new THREE.MeshStandardMaterial({
+            color: 0x101923
+        })
     );
 
     road.rotation.x = -Math.PI / 2;
     road.position.set(x, 0.04, z);
+
     scene.add(road);
 }
 
+// =====================================
+// BUILDINGS
+// =====================================
+
 function createBuilding(x, z) {
-    const height = 5 + Math.random() * 15;
+    const height = 7 + Math.random() * 17;
     const width = 6 + Math.random() * 5;
 
     const building = new THREE.Mesh(
-        new THREE.BoxGeometry(width, height, width),
+        new THREE.BoxGeometry(
+            width,
+            height,
+            width
+        ),
         new THREE.MeshStandardMaterial({
             color: 0x263b53,
             metalness: 0.4,
@@ -286,16 +356,49 @@ function createBuilding(x, z) {
         })
     );
 
-    building.position.set(x, height / 2, z);
+    building.position.set(
+        x,
+        height / 2,
+        z
+    );
+
     building.castShadow = true;
     building.receiveShadow = true;
+
     scene.add(building);
 
+    // Neon roof
+    const roof = new THREE.Mesh(
+        new THREE.BoxGeometry(
+            width + 0.2,
+            0.15,
+            width + 0.2
+        ),
+        new THREE.MeshBasicMaterial({
+            color: 0x00cfff
+        })
+    );
+
+    roof.position.set(
+        x,
+        height + 0.05,
+        z
+    );
+
+    scene.add(roof);
+
+    // Windows
     for (let y = 2; y < height - 1; y += 3) {
         for (const side of [-1, 1]) {
             const windowMesh = new THREE.Mesh(
-                new THREE.BoxGeometry(0.8, 1, 0.08),
-                new THREE.MeshBasicMaterial({ color: 0x00cfff })
+                new THREE.BoxGeometry(
+                    0.8,
+                    1,
+                    0.08
+                ),
+                new THREE.MeshBasicMaterial({
+                    color: 0x00cfff
+                })
             );
 
             windowMesh.position.set(
@@ -310,50 +413,84 @@ function createBuilding(x, z) {
 }
 
 // =====================================
-// AVATAR AND COSMETICS
+// PLAYER AVATAR
 // =====================================
 
 function createAvatar(color, selected = equipment) {
     const group = new THREE.Group();
 
     const outfitColor =
-        colors.outfit[selected.outfit] || colors.outfit.default;
+        colors.outfit[selected.outfit] ||
+        colors.outfit.default;
 
+    // Body
     const body = new THREE.Mesh(
-        new THREE.CapsuleGeometry(0.48, 0.9, 5, 10),
-        new THREE.MeshStandardMaterial({ color: outfitColor })
+        new THREE.CapsuleGeometry(
+            0.48,
+            0.9,
+            5,
+            10
+        ),
+        new THREE.MeshStandardMaterial({
+            color: outfitColor,
+            metalness: 0.3,
+            roughness: 0.5
+        })
     );
 
     body.position.y = 1.15;
     body.castShadow = true;
     group.add(body);
 
+    // Head
     const head = new THREE.Mesh(
-        new THREE.SphereGeometry(0.34, 20, 20),
-        new THREE.MeshStandardMaterial({ color })
+        new THREE.SphereGeometry(
+            0.34,
+            20,
+            20
+        ),
+        new THREE.MeshStandardMaterial({
+            color: color
+        })
     );
 
     head.position.y = 2.05;
     head.castShadow = true;
     group.add(head);
 
+    // Eyes
     for (const side of [-1, 1]) {
         const eye = new THREE.Mesh(
-            new THREE.SphereGeometry(0.045, 12, 12),
-            new THREE.MeshBasicMaterial({ color: 0x111111 })
+            new THREE.SphereGeometry(
+                0.045,
+                12,
+                12
+            ),
+            new THREE.MeshBasicMaterial({
+                color: 0x111111
+            })
         );
 
-        eye.position.set(side * 0.12, 2.12, 0.30);
+        eye.position.set(
+            side * 0.12,
+            2.12,
+            0.30
+        );
+
         group.add(eye);
     }
 
-    // Decorative cosmetic item only
-
+    // Decorative cosmetic item
     const accessoryColor =
-        colors.weapon[selected.weapon] || colors.weapon.neon;
+        colors.weapon[selected.weapon] ||
+        colors.weapon.neon;
 
     const accessory = new THREE.Mesh(
-        new THREE.BoxGeometry(0.13, 0.13, 0.8),
+        new THREE.BoxGeometry(
+            0.13,
+            0.13,
+            0.8
+        ),
         new THREE.MeshStandardMaterial({
             color: accessoryColor,
             emissive: accessoryColor,
@@ -361,15 +498,28 @@ function createAvatar(color, selected = equipment) {
         })
     );
 
-    accessory.position.set(0.55, 1.25, 0.2);
+    accessory.position.set(
+        0.55,
+        1.25,
+        0.2
+    );
+
     group.add(accessory);
 
+    // Energy shield
     const shieldColor =
-        colors.shield[selected.shield] || colors.shield.blue;
+        colors.shield[selected.shield] ||
+        colors.shield.blue;
 
     const shield = new THREE.Mesh(
         new THREE.SphereGeometry(
-            0.55, 16, 16, 0, Math.PI * 2, 0, Math.PI
+            0.55,
+            16,
+            16,
+            0,
+            Math.PI * 2,
+            0,
+            Math.PI
         ),
         new THREE.MeshStandardMaterial({
             color: shieldColor,
@@ -378,15 +528,31 @@ function createAvatar(color, selected = equipment) {
         })
     );
 
-    shield.position.set(-0.65, 1.25, 0);
-    shield.scale.set(0.45, 1.2, 0.3);
+    shield.position.set(
+        -0.65,
+        1.25,
+        0
+    );
+
+    shield.scale.set(
+        0.45,
+        1.2,
+        0.3
+    );
+
     group.add(shield);
 
     return group;
 }
 
+// =====================================
+// OTHER PLAYERS
+// =====================================
+
 function addOtherPlayer(data) {
-    if (!data?.id || data.id === socket?.id || !scene) return;
+    if (!data?.id || data.id === socket?.id || !scene) {
+        return;
+    }
 
     let object = otherPlayers.get(data.id);
 
@@ -405,7 +571,8 @@ function addOtherPlayer(data) {
         Number(data.z) || 0
     );
 
-    object.rotation.y = Number(data.rotation) || 0;
+    object.rotation.y =
+        Number(data.rotation) || 0;
 
     scene.add(object);
     otherPlayers.set(data.id, object);
@@ -427,19 +594,22 @@ function updateOtherPlayer(data) {
         Number(data.z) || 0
     );
 
-    object.rotation.y = Number(data.rotation) || 0;
+    object.rotation.y =
+        Number(data.rotation) || 0;
 }
 
 function removeOtherPlayer(id) {
     const object = otherPlayers.get(id);
 
-    if (object && scene) scene.remove(object);
+    if (object && scene) {
+        scene.remove(object);
+    }
 
     otherPlayers.delete(id);
 }
 
 // =====================================
-// MOVEMENT
+// PLAYER MOVEMENT
 // =====================================
 
 function movePlayer(delta) {
@@ -452,7 +622,7 @@ function movePlayer(delta) {
     if (keys.left) direction.x -= 1;
     if (keys.right) direction.x += 1;
 
-    if (direction.length() === 0) return;
+    if (direction.lengthSq() === 0) return;
 
     direction.normalize();
 
@@ -469,8 +639,15 @@ function movePlayer(delta) {
         player.position.z, -75, 75
     );
 
-    player.rotation.y = Math.atan2(direction.x, direction.z);
+    player.rotation.y = Math.atan2(
+        direction.x,
+        direction.z
+    );
 }
+
+// =====================================
+// KEYBOARD CONTROLS
+// =====================================
 
 function setupKeyboard() {
     window.addEventListener("keydown", event => {
@@ -481,14 +658,17 @@ function setupKeyboard() {
             case "arrowup":
                 keys.forward = true;
                 break;
+
             case "s":
             case "arrowdown":
                 keys.backward = true;
                 break;
+
             case "a":
             case "arrowleft":
                 keys.left = true;
                 break;
+
             case "d":
             case "arrowright":
                 keys.right = true;
@@ -502,24 +682,33 @@ function setupKeyboard() {
             case "arrowup":
                 keys.forward = false;
                 break;
+
             case "s":
             case "arrowdown":
                 keys.backward = false;
                 break;
+
             case "a":
             case "arrowleft":
                 keys.left = false;
                 break;
+
             case "d":
             case "arrowright":
                 keys.right = false;
                 break;
         }
     });
+
+    window.addEventListener("blur", () => {
+        Object.keys(keys).forEach(key => {
+            keys[key] = false;
+        });
+    });
 }
 
 // =====================================
-// MOBILE CONTROLS
+// MOBILE TOUCH CONTROLS
 // =====================================
 
 function setupTouchControls() {
@@ -546,10 +735,11 @@ function setupTouchControls() {
     controls.style.display = "block";
 
     controls.querySelectorAll("button").forEach(button => {
-        const key = button.dataset.key;
-
         if (button.dataset.ready) return;
+
         button.dataset.ready = "yes";
+
+        const key = button.dataset.key;
 
         button.addEventListener("pointerdown", event => {
             event.preventDefault();
@@ -569,7 +759,9 @@ function setupTouchControls() {
 function hideTouchControls() {
     const controls = document.getElementById("touchControls");
 
-    if (controls) controls.style.display = "none";
+    if (controls) {
+        controls.style.display = "none";
+    }
 
     Object.keys(keys).forEach(key => {
         keys[key] = false;
@@ -577,7 +769,7 @@ function hideTouchControls() {
 }
 
 // =====================================
-// FRONT CAMERA
+// THIRD PERSON CAMERA
 // =====================================
 
 function updateCamera() {
@@ -590,22 +782,47 @@ function updateCamera() {
     );
 
     const target = new THREE.Vector3(
-        player.position.x + forward.x * 8,
-        player.position.y + 3.2,
-        player.position.z + forward.z * 8
+        player.position.x - forward.x * 6,
+        player.position.y + 3,
+        player.position.z - forward.z * 6
     );
 
     camera.position.lerp(target, 0.09);
 
     camera.lookAt(
         player.position.x,
-        player.position.y + 1.1,
+        player.position.y + 1.2,
         player.position.z
     );
 }
 
 // =====================================
-// ANIMATION
+// LANDSCAPE AND FULLSCREEN
+// =====================================
+
+async function enterGameDisplay() {
+    try {
+        if (!document.fullscreenElement &&
+            gameElement.requestFullscreen) {
+            await gameElement.requestFullscreen();
+        }
+    } catch (error) {
+        console.log("Fullscreen unavailable");
+    }
+
+    try {
+        if (screen.orientation?.lock) {
+            await screen.orientation.lock("landscape");
+        }
+    } catch (error) {
+        console.log("Landscape lock unavailable");
+    }
+
+    resizeGame();
+}
+
+// =====================================
+// GAME ANIMATION
 // =====================================
 
 function animate(time = 0) {
@@ -628,70 +845,106 @@ function animate(time = 0) {
         lastNetworkUpdate = time;
     }
 
-    renderer.render(scene, camera);
+    if (renderer && scene && camera) {
+        renderer.render(scene, camera);
+    }
 }
 
 // =====================================
-// GAME START / EXIT
+// START GAME
 // =====================================
 
-function startGame() {
+async function startGame() {
     if (gameRunning) return;
 
-    if (!scene) createWorld();
+    if (!scene) {
+        createWorld();
+    }
 
     gameRunning = true;
 
-    menu.hidden = true;
-    gameElement.hidden = false;
+    if (menu) menu.hidden = true;
+    if (gameElement) gameElement.hidden = false;
 
     setupTouchControls();
 
-    // Connect in background. Never block PLAY.
     connectServer();
 
     previousTime = 0;
+    lastNetworkUpdate = 0;
+
+    await enterGameDisplay();
+
     animate();
 }
+
+// =====================================
+// EXIT GAME
+// =====================================
 
 function exitGame() {
     gameRunning = false;
 
     if (animationId) {
         cancelAnimationFrame(animationId);
+        animationId = null;
     }
 
     hideTouchControls();
 
-    menu.hidden = false;
-    gameElement.hidden = true;
+    if (menu) menu.hidden = false;
+    if (gameElement) gameElement.hidden = true;
 
-    if (socket) socket.disconnect();
+    if (socket) {
+        socket.disconnect();
+    }
 
-    otherPlayers.forEach(object => scene?.remove(object));
+    if (scene) {
+        otherPlayers.forEach(object => {
+            scene.remove(object);
+        });
+    }
+
     otherPlayers.clear();
+
+    if (document.fullscreenElement) {
+        document.exitFullscreen().catch(() => {});
+    }
+
+    try {
+        screen.orientation?.unlock();
+    } catch (error) {}
 
     updateOnlineCount();
 }
 
+// =====================================
+// RESIZE GAME
+// =====================================
+
 function resizeGame() {
     if (!camera || !renderer) return;
 
-    camera.aspect = window.innerWidth / window.innerHeight;
+    const width = window.innerWidth;
+    const height = window.innerHeight;
+
+    camera.aspect = width / height;
     camera.updateProjectionMatrix();
 
-    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setSize(width, height);
 }
 
 // =====================================
-// SAVE SETTINGS
+// SAVE PLAYER SETTINGS
 // =====================================
 
 function saveAvatar() {
     localStorage.setItem("neoUsername", playerName);
     localStorage.setItem("neoColor", playerColor);
 
-    if (playerInfo) playerInfo.textContent = playerName;
+    if (playerInfo) {
+        playerInfo.textContent = playerName;
+    }
 }
 
 function saveEquipment() {
@@ -705,21 +958,21 @@ function saveEquipment() {
         const rotation = player.rotation.y;
 
         scene.remove(player);
+
         player = createAvatar(playerColor, equipment);
+
         player.position.copy(position);
         player.rotation.y = rotation;
+
         scene.add(player);
     }
 
     sendPlayerUpdate();
 }
 
-function cleanName(value) {
-    return String(value || "Žaidėjas")
-        .replace(/[<>]/g, "")
-        .trim()
-        .slice(0, 18) || "Žaidėjas";
-}
+// =====================================
+// HTML SAFETY
+// =====================================
 
 function escapeHTML(value) {
     return String(value).replace(/[&<>"']/g, char => ({
@@ -730,6 +983,7 @@ function escapeHTML(value) {
         "'": "&#39;"
     })[char]);
 }
+
 
 // =====================================
 // MENU PANELS
@@ -742,19 +996,21 @@ function showPanel(name) {
 
     if (name === "avatar") {
         menuPanel.innerHTML = `
-            <h2>Avatar</h2>
+            <h2>AVATAR</h2>
+
             <label>Player name</label>
-            <input id="avatarName" maxlength="18"
-                value="${escapeHTML(playerName)}">
+            <input id="avatarName" maxlength="18">
 
             <label>Avatar color</label>
-            <input id="avatarColor" type="color"
-                value="${playerColor}">
+            <input id="avatarColor" type="color">
 
-            <button id="saveAvatar">SAVE</button>
+            <button id="saveAvatarButton">SAVE</button>
         `;
 
-        document.getElementById("saveAvatar").onclick = () => {
+        document.getElementById("avatarName").value = playerName;
+        document.getElementById("avatarColor").value = playerColor;
+
+        document.getElementById("saveAvatarButton").onclick = () => {
             playerName = cleanName(
                 document.getElementById("avatarName").value
             );
@@ -766,13 +1022,19 @@ function showPanel(name) {
 
             if (scene && player) {
                 const position = player.position.clone();
+                const rotation = player.rotation.y;
+
                 scene.remove(player);
+
                 player = createAvatar(playerColor, equipment);
                 player.position.copy(position);
+                player.rotation.y = rotation;
+
                 scene.add(player);
             }
 
             sendPlayerUpdate();
+            alert("Avatar saved!");
         };
     }
 
@@ -857,25 +1119,45 @@ function showPanel(name) {
         menuPanel.innerHTML = `
             <h2>SETTINGS</h2>
             <p>Movement: W A S D or mobile buttons.</p>
-            <p>Camera: front third-person view.</p>
+            <p>Camera: third-person view.</p>
+            <button id="closePanel">CLOSE</button>
         `;
+
+        document.getElementById("closePanel").onclick = closePanel;
     }
 
     else if (name === "updates") {
         menuPanel.innerHTML = `
             <h2>UPDATES</h2>
             <p>Neo Shooter 3D</p>
-            <p>3D world, avatars and cosmetics.</p>
+            <p>New neon city and avatar customization.</p>
+            <p>Mobile controls and multiplayer support.</p>
         `;
     }
 }
 
 // =====================================
-// BUTTON EVENTS
+// CLOSE MENU PANEL
 // =====================================
 
-playButton?.addEventListener("click", startGame);
-exitButton?.addEventListener("click", exitGame);
+function closePanel() {
+    if (menuPanel) {
+        menuPanel.hidden = true;
+        menuPanel.innerHTML = "";
+    }
+}
+
+// =====================================
+// MENU BUTTONS
+// =====================================
+
+if (playButton) {
+    playButton.addEventListener("click", startGame);
+}
+
+if (exitButton) {
+    exitButton.addEventListener("click", exitGame);
+}
 
 document.querySelectorAll("[data-panel]").forEach(button => {
     button.addEventListener("click", () => {
@@ -883,12 +1165,12 @@ document.querySelectorAll("[data-panel]").forEach(button => {
     });
 });
 
-document.getElementById("closePanel")?.addEventListener("click", () => {
-    menuPanel.hidden = true;
+document.querySelectorAll("[data-close-panel]").forEach(button => {
+    button.addEventListener("click", closePanel);
 });
 
 // =====================================
-// INITIALIZATION
+// INITIALIZE
 // =====================================
 
 if (playerInfo) {
@@ -896,9 +1178,7 @@ if (playerInfo) {
 }
 
 setServerStatus("Ready");
+
 setupKeyboard();
 
-menu.hidden = false;
-gameElement.hidden = true;
-
-console.log("Neo Shooter 3D ready!");
+console.log("NEO SHOOTER 3D READY");
